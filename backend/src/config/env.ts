@@ -36,6 +36,16 @@ const schema = z.object({
   DB_POOL_MAX: z.coerce.number().int().min(1).max(50).default(10),
   SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(168).default(8),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
+  // Search (Algolia). Optional: without them search falls back to PostgreSQL and indexing is paused.
+  // The admin key is backend-only. Never prefix these with VITE_.
+  ALGOLIA_APP_ID: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).max(64).optional()),
+  ALGOLIA_ADMIN_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(8).optional()),
+  ALGOLIA_SEARCH_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(8).optional()),
+  ALGOLIA_TIMEOUT_MS: z.coerce.number().int().min(200).max(15000).default(3000),
+}).superRefine((v, ctx) => {
+  if (v.ALGOLIA_APP_ID && !v.ALGOLIA_ADMIN_API_KEY) {
+    ctx.addIssue({ code: 'custom', path: ['ALGOLIA_ADMIN_API_KEY'], message: 'required when ALGOLIA_APP_ID is set' });
+  }
 });
 
 export type Env = z.infer<typeof schema>;

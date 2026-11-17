@@ -18,6 +18,9 @@ import { doctorsRouter } from './modules/doctors/doctors.routes.js';
 import { appointmentsRouter } from './modules/appointments/appointments.routes.js';
 import { consultationsRouter } from './modules/consultations/consultations.routes.js';
 import { prescriptionsRouter } from './modules/prescriptions/prescriptions.routes.js';
+import { catalogueRouter } from './modules/medicines/catalogue.routes.js';
+import { pharmacyRouter } from './modules/pharmacy/pharmacy.routes.js';
+import type { SearchProvider } from './modules/search/search-provider.js';
 
 export interface AppDeps {
   env: Pick<Env, 'APP_ORIGIN'> & Partial<Pick<Env, 'NODE_ENV' | 'SESSION_TTL_HOURS'>>;
@@ -26,11 +29,13 @@ export interface AppDeps {
   migrationsDir?: string;
   hasher?: PasswordHasher;
   limits?: AuthLimits;
+  /** Search provider, or null when not configured. Search falls back to PostgreSQL in that case. */
+  search?: SearchProvider | null;
 }
 
 export const BODY_LIMIT = '100kb';
 
-export function createApp({ env, db, logger, migrationsDir, hasher, limits }: AppDeps): Express {
+export function createApp({ env, db, logger, migrationsDir, hasher, limits, search = null }: AppDeps): Express {
   const nodeEnv = env.NODE_ENV ?? 'development';
   const app = express();
   app.disable('x-powered-by');
@@ -89,6 +94,8 @@ export function createApp({ env, db, logger, migrationsDir, hasher, limits }: Ap
   api.use(appointmentsRouter({ db, nodeEnv }));
   api.use(consultationsRouter({ db, nodeEnv }));
   api.use(prescriptionsRouter({ db, nodeEnv }));
+  api.use(catalogueRouter({ db, nodeEnv, search }));
+  api.use(pharmacyRouter({ db, nodeEnv }));
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);

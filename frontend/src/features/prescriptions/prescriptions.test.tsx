@@ -24,7 +24,8 @@ function rx(overrides: Partial<Prescription> = {}): Prescription {
       allergyClass: 'Penicillin', dose: '500 mg', frequency: 'Three times a day', durationDays: 5, instructions: null, quantity: 15,
     }],
     allergyCheck: null,
-    checks: { allergyMatches: [], blockers: [], canIssue: true },
+    checks: { allergyMatches: [], interactions: [], notChronicEligible: [], blockers: [], canIssue: true },
+    validityDays: 30,
     ...overrides,
   };
 }
@@ -34,6 +35,8 @@ describe('prescriptions', () => {
     const conflict = rx({
       checks: {
         allergyMatches: [{ medicineSku: 'MED-1002', medicineName: 'Amoxicillin 500 mg capsule', allergyClass: 'Penicillin', matchedOn: 'ALLERGY_CLASS' }],
+        interactions: [],
+        notChronicEligible: [],
         blockers: ['A medicine matches a recorded allergy'],
         canIssue: false,
       },

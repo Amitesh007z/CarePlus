@@ -34,7 +34,21 @@ export interface Prescription {
   supersededById: string | null;
   items: RxItem[];
   allergyCheck: { policy: string; matches: AllergyMatch[]; checkedAt: string } | null;
-  checks: { allergyMatches: AllergyMatch[]; blockers: string[]; canIssue: boolean } | null;
+  validityDays: 30 | 90;
+  checks: {
+    allergyMatches: AllergyMatch[];
+    interactions: DrugInteraction[];
+    notChronicEligible: { id: string; name: string }[];
+    blockers: string[];
+    canIssue: boolean;
+  } | null;
+}
+
+export interface DrugInteraction {
+  severity: 'MAJOR' | 'MODERATE' | 'MINOR';
+  effect: string;
+  sourceReference: string;
+  medicines: { id: string; name: string }[];
 }
 
 export interface PrescriptionSummary {

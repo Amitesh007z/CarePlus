@@ -18,6 +18,8 @@ interface Who {
   id: string;
   cookie: string;
   csrf: string;
+  /** Doctors only: a unique directory name, so searches do not depend on how many doctors exist. */
+  name?: string;
 }
 
 const uniq = () => `${Date.now().toString(36)}${randomInt(1e6).toString(36)}`;
@@ -57,10 +59,11 @@ describe.skipIf(!url)('C2: profile, consent, doctors and appointments (integrati
       [email, mobile(), await testHasher.hash(PASSWORD)],
     );
     const id = u.rows[0]!.id;
+    const name = `Dr Test ${uniq()}`;
     await db.query(
       `INSERT INTO doctor_profiles (user_id, display_name, specialty, registration_no, experience_years, active)
-       VALUES ($1, 'Dr Test', 'General Physician', $2, 10, $3)`,
-      [id, `REG-${uniq()}`, active],
+       VALUES ($1, $4, 'General Physician', $2, 10, $3)`,
+      [id, `REG-${uniq()}`, active, name],
     );
     for (let weekday = 0; weekday <= 6; weekday++) {
       await db.query(
@@ -69,7 +72,7 @@ describe.skipIf(!url)('C2: profile, consent, doctors and appointments (integrati
         [id, weekday],
       );
     }
-    return login(email, id);
+    return { ...(await login(email, id)), name };
   }
 
   async function makePatient(): Promise<Who> {
@@ -205,7 +208,7 @@ describe.skipIf(!url)('C2: profile, consent, doctors and appointments (integrati
   });
 
   it('directory and slots: public fields only; inactive doctors are invisible; slots are future-only', async () => {
-    const list = await api('get', '/api/v1/doctors?query=Dr', anita);
+    const list = await api('get', `/api/v1/doctors?query=${encodeURIComponent(doctor.name!)}`, anita);
     expect(list.status).toBe(200);
     const ids = (list.body.data.items as { id: string }[]).map((d) => d.id);
     expect(ids).toContain(doctor.id);

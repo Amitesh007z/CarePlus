@@ -14,12 +14,20 @@ const NAV: Record<Role, { to: string; label: string }[]> = {
     { to: '/appointments', label: 'Appointments' },
     { to: '/patient/visits', label: 'Visits' },
     { to: '/patient/prescriptions', label: 'Prescriptions' },
+    { to: '/medicines', label: 'Medicines' },
     { to: '/patient/health', label: 'Health' },
     { to: '/patient/profile', label: 'Profile' },
   ],
   DOCTOR: [{ to: '/doctor/dashboard', label: 'Home' }],
-  PHARMACIST: [{ to: '/pharmacy/dashboard', label: 'Home' }],
-  ADMIN: [{ to: '/admin/dashboard', label: 'Home' }],
+  PHARMACIST: [
+    { to: '/pharmacy/dashboard', label: 'Home' },
+    { to: '/pharmacy/queue', label: 'Queue' },
+    { to: '/pharmacy/stock', label: 'Stock' },
+  ],
+  ADMIN: [
+    { to: '/admin/dashboard', label: 'Home' },
+    { to: '/admin/medicines', label: 'Medicines' },
+  ],
 };
 
 const navLink = ({ isActive }: { isActive: boolean }) =>

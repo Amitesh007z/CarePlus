@@ -5,6 +5,7 @@
 // script moves the patient's just-booked slot to five minutes from now. Everything else goes through the UI.
 import { chromium } from 'playwright-core';
 import { Pool, neonConfig } from '@neondatabase/serverless';
+import { hash as argon2Hash } from '@node-rs/argon2';
 import ws from 'ws';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -28,6 +29,7 @@ const DOCTOR = 'dr.mehta@example.com';
 const results = [];
 let patient;
 let doctorPage;
+let pharmacistPage;
 const step = (name) => console.log(`-> ${name}`);
 const pass = (name) => {
   results.push(name);
@@ -62,6 +64,8 @@ try {
   pass('patient is redirected away from the doctor workspace');
 
   await patient.goto(`${WEB}/doctors`);
+  // The directory is shared by every test run, so search by name rather than relying on page order.
+  await patient.getByLabel('Search doctors by name or specialty').fill('Mehta');
   await patient.getByRole('link', { name: /Dr\. Mehta/ }).first().click();
   await patient.getByRole('button', { name: /available/ }).first().click();
   await patient.getByLabel('What is your main concern?').fill('Sore throat and fever');
@@ -188,11 +192,72 @@ try {
   if (!drafts.ok()) throw new Error(`patient list request failed: ${drafts.status()}`);
   pass('patient list is served by the API with the patient session');
 
+  // ---- Patient sends the prescription to a pharmacy; the pharmacist fulfils it ----------------
+  step('patient sends the prescription to the pharmacy queue');
+  await patient.goto(`${WEB}/patient/prescriptions`);
+  await patient.getByRole('link', { name: new RegExp(rxNumber) }).click();
+  await patient.getByRole('heading', { name: new RegExp(rxNumber) }).waitFor();
+  await Promise.all([
+    patient.waitForResponse((r) => r.url().endsWith('/fulfilment') && r.request().method() === 'POST' && r.status() === 201),
+    patient.getByRole('button', { name: 'Send to pharmacy' }).click(),
+  ]);
+  pass('patient sends the issued prescription to the pharmacy queue');
+
+  step('pharmacist verifies, packs, dispatches and delivers it; stock and prescription status update');
+  // A run-scoped pharmacist on the .invalid test domain, so the seeded account and its password are never touched.
+  const runTag = Date.now().toString(36);
+  const pharmacistEmail = `pharmacist.${runTag}@carepulse-e2e.invalid`;
+  const pharmacistPassword = `Run-${runTag}-Pharm1`;
+  const phone = `9${String(Math.floor(Math.random() * 1e9)).padStart(9, '0')}`;
+  const created = await pool.query(
+    `INSERT INTO users (role, email, mobile, password_hash, email_verified_at) VALUES ('PHARMACIST', $1, $2, $3, now()) RETURNING id`,
+    [pharmacistEmail, phone, await argon2Hash(pharmacistPassword)],
+  );
+  await pool.query(`INSERT INTO pharmacist_profiles (user_id, display_name) VALUES ($1, 'E2E Pharmacist')`, [created.rows[0].id]);
+  const pharmacistCtx = await browser.newContext({ viewport: { width: 1360, height: 900 } });
+  const pharmacist = await pharmacistCtx.newPage();
+  pharmacistPage = pharmacist;
+  pharmacist.setDefaultTimeout(30000);
+  await pharmacist.goto(`${WEB}/login`);
+  await pharmacist.getByLabel('Email or mobile').fill(pharmacistEmail);
+  await pharmacist.getByLabel('Password').fill(pharmacistPassword);
+  // Wait for the login response before navigating, or the navigation aborts the request and the session is never set.
+  await Promise.all([
+    pharmacist.waitForResponse((r) => r.url().endsWith('/api/v1/auth/login') && r.status() === 200),
+    pharmacist.getByRole('button', { name: 'Sign in' }).click(),
+  ]);
+  await pharmacist.goto(`${WEB}/pharmacy/queue`);
+  await pharmacist.locator('a', { hasText: rxNumber }).first().click();
+  await pharmacist.getByRole('button', { name: 'Verify prescription' }).click();
+  await pharmacist.getByRole('button', { name: 'Pack and dispense' }).waitFor();
+  await pharmacist.getByRole('button', { name: 'Pack and dispense' }).click();
+  await pharmacist.getByRole('button', { name: 'Mark out for delivery' }).waitFor();
+  await pharmacist.getByRole('button', { name: 'Mark out for delivery' }).click();
+  await pharmacist.getByRole('button', { name: 'Mark delivered' }).waitFor();
+  await pharmacist.getByRole('button', { name: 'Mark delivered' }).click();
+  await pharmacist.getByText(/Delivered/).first().waitFor();
+  await shot(pharmacist, '06-pharmacist-delivered');
+  pass('pharmacist takes the prescription from verified to delivered');
+
+  const after = await pool.query(
+    `SELECT p.status, f.status AS fulfilment, m.stock_qty FROM prescriptions p
+       JOIN fulfilments f ON f.prescription_id = p.id
+       JOIN prescription_items pi ON pi.prescription_id = p.id
+       JOIN medicines m ON m.id = pi.medicine_id
+      WHERE p.rx_number = $1 AND f.status = 'DELIVERED' LIMIT 1`,
+    [rxNumber],
+  );
+  if (after.rowCount !== 1 || after.rows[0].status !== 'FULFILLED') {
+    throw new Error(`expected the prescription FULFILLED with a DELIVERED request, got ${JSON.stringify(after.rows)}`);
+  }
+  pass('prescription is FULFILLED and its pharmacy request is DELIVERED in the database');
+  await pharmacistCtx.close();
+
   console.log(`\nJOURNEY PASSED: ${results.length} checks`);
   await patientCtx.close();
   await doctorCtx.close();
 } catch (err) {
-  for (const [name, page] of [['failure-patient', patient], ['failure-doctor', doctorPage]]) {
+  for (const [name, page] of [['failure-patient', patient], ['failure-doctor', doctorPage], ['failure-pharmacist', pharmacistPage]]) {
     if (page) await shot(page, name).catch(() => undefined);
   }
   console.error('\nJOURNEY FAILED:', err.message);

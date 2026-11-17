@@ -36,8 +36,8 @@ export function prescriptionsRouter({ db, nodeEnv }: { db: Database; nodeEnv: st
 
   r.patch('/doctor/prescriptions/:id', ...doctor, async (req, res) => {
     const id = parseUuid(req.params.id);
-    const { advice } = headerUpdateSchema.parse(req.body);
-    await rx.updateAdvice(db, req.auth!.userId, id, advice, auditContext(req));
+    const input = headerUpdateSchema.parse(req.body);
+    await rx.updateHeader(db, req.auth!.userId, id, { advice: input.advice === undefined ? undefined : input.advice || null, validityDays: input.validityDays }, auditContext(req));
     send(req, res, await rx.getForDoctor(db, req.auth!.userId, id));
   });
 

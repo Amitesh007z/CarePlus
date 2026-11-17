@@ -5,6 +5,7 @@ import { addDays, istDateOf } from '../../common/time.js';
 import type { Database, Queryable } from '../../infrastructure/database/pool.js';
 import { ageFromDob } from '../auth/user.repository.js';
 import { CONSENT_WITHDRAWN } from '../consultations/consultations.service.js';
+import { chronicIneligible, interactionsAmong, type InteractionView } from '../medicines/catalogue.service.js';
 import type { ItemCreate, ItemUpdate } from './prescriptions.schemas.js';
 
 /** Allergy policy is configuration in code, not a model decision. BLOCK refuses issuance. */
@@ -96,8 +97,15 @@ export interface PrescriptionView {
   supersededById: string | null;
   items: ItemView[];
   allergyCheck: { policy: string; matches: AllergyMatch[]; checkedAt: string } | null;
-  /** Live checks for drafts. Empty for issued records. */
-  checks: { allergyMatches: AllergyMatch[]; blockers: string[]; canIssue: boolean } | null;
+  validityDays: number;
+  /** Live checks for drafts. Null for issued records, which carry their checks at issue time. */
+  checks: {
+    allergyMatches: AllergyMatch[];
+    interactions: InteractionView[];
+    notChronicEligible: { id: string; name: string }[];
+    blockers: string[];
+    canIssue: boolean;
+  } | null;
 }
 
 interface HeaderRow {
@@ -120,6 +128,7 @@ interface HeaderRow {
   replaces_prescription_id: string | null;
   superseded_by_id: string | null;
   allergy_check: { policy: string; matches: AllergyMatch[]; checkedAt: string } | null;
+  validity_days: number;
 }
 
 interface RxRow {
@@ -132,20 +141,22 @@ interface RxRow {
   replaces_prescription_id: string | null;
   valid_till: string | null;
   consent_status: boolean;
+  validity_days: number;
 }
 
 const HEADER_SQL = `SELECT p.id, p.rx_number, p.status, p.consultation_id, c.status AS consultation_status,
   p.patient_user_id, pp.full_name AS patient_name, to_char(pp.dob, 'YYYY-MM-DD') AS dob,
   p.doctor_user_id, d.display_name AS doctor_name, d.specialty, d.registration_no, p.advice, p.issued_at,
   to_char(p.valid_till, 'YYYY-MM-DD') AS valid_till, p.fulfilled_at, p.replaces_prescription_id,
-  p.superseded_by_id, p.allergy_check
+  p.superseded_by_id, p.allergy_check, p.validity_days
   FROM prescriptions p
   JOIN consultations c ON c.id = p.consultation_id
   JOIN patient_profiles pp ON pp.user_id = p.patient_user_id
   JOIN doctor_profiles d ON d.user_id = p.doctor_user_id`;
 
 const RX_SQL = `SELECT p.id, p.status, p.consultation_id, c.status AS consultation_status, p.patient_user_id,
-  p.doctor_user_id, p.replaces_prescription_id, to_char(p.valid_till, 'YYYY-MM-DD') AS valid_till, pp.consent_status
+  p.doctor_user_id, p.replaces_prescription_id, to_char(p.valid_till, 'YYYY-MM-DD') AS valid_till, pp.consent_status,
+  p.validity_days
   FROM prescriptions p
   JOIN consultations c ON c.id = p.consultation_id
   JOIN patient_profiles pp ON pp.user_id = p.patient_user_id
@@ -216,15 +227,20 @@ async function buildView(db: Queryable, id: string, today: string): Promise<Pres
   let checks: PrescriptionView['checks'] = null;
   if (isDraft) {
     const rawItems = await itemsOf(db, id);
+    const medicineIds = rawItems.map((i) => i.medicine_id);
     const matches = matchAllergies(
       rawItems.map((i) => ({ sku: i.sku, name: i.medicine_name, allergyClass: i.allergy_class })),
       await activeAllergies(db, h.patient_user_id),
     );
+    const interactions = await interactionsAmong(db, medicineIds);
+    const notChronicEligible = h.validity_days === 90 ? await chronicIneligible(db, medicineIds) : [];
     const blockers: string[] = [];
     if (h.consultation_status !== 'FINALIZED') blockers.push('Finalize the consultation before issuing');
     if (items.length === 0) blockers.push('Add at least one medicine');
     if (matches.length > 0) blockers.push('A medicine matches a recorded allergy');
-    checks = { allergyMatches: matches, blockers, canIssue: blockers.length === 0 };
+    if (interactions.some((i) => i.severity === 'MAJOR')) blockers.push('A major drug interaction blocks issuing this prescription');
+    if (notChronicEligible.length > 0) blockers.push('90-day validity needs chronic-eligible medicines only');
+    checks = { allergyMatches: matches, interactions, notChronicEligible, blockers, canIssue: blockers.length === 0 };
   }
 
   return {
@@ -242,6 +258,7 @@ async function buildView(db: Queryable, id: string, today: string): Promise<Pres
     supersededById: h.superseded_by_id,
     items,
     allergyCheck: h.allergy_check,
+    validityDays: h.validity_days,
     checks,
   };
 }
@@ -350,12 +367,30 @@ export async function removeItem(db: Database, doctorId: string, rxId: string, i
   });
 }
 
-export async function updateAdvice(db: Database, doctorId: string, rxId: string, advice: string | null, ctx: AuditContext): Promise<void> {
+/**
+ * Draft header: advice and validity. 90 days is allowed only when every medicine is marked chronic-eligible
+ * by an admin. Until a medicine is marked, 90 days is refused. Nothing is inferred.
+ */
+export async function updateHeader(
+  db: Database,
+  doctorId: string,
+  rxId: string,
+  input: { advice?: string | null; validityDays?: 30 | 90 },
+  ctx: AuditContext,
+): Promise<void> {
   await db.transaction(async (tx) => {
     const rx = await rxForDoctor(tx, doctorId, rxId, true);
     assertDraft(rx);
-    await tx.query('UPDATE prescriptions SET advice = $2 WHERE id = $1', [rxId, advice]);
-    await audit(tx, ctx, { action: 'PRESCRIPTION_ADVICE_UPDATED', entityType: 'prescription', entityId: rxId });
+    if (input.validityDays === 90) {
+      const ids = (await itemsOf(tx, rxId)).map((i) => i.medicine_id);
+      const bad = await chronicIneligible(tx, ids);
+      if (bad.length) {
+        throw new AppError(422, 'NOT_CHRONIC_ELIGIBLE', '90-day validity needs chronic-eligible medicines only', bad.map((b) => ({ path: `items.${b.name}`, message: 'Not marked chronic-eligible' })));
+      }
+    }
+    if (input.advice !== undefined) await tx.query('UPDATE prescriptions SET advice = $2 WHERE id = $1', [rxId, input.advice]);
+    if (input.validityDays !== undefined) await tx.query('UPDATE prescriptions SET validity_days = $2 WHERE id = $1', [rxId, input.validityDays]);
+    await audit(tx, ctx, { action: 'PRESCRIPTION_HEADER_UPDATED', entityType: 'prescription', entityId: rxId, after: { changed: Object.keys(input) } });
   });
 }
 
@@ -386,8 +421,23 @@ export async function issuePrescription(db: Database, doctorId: string, rxId: st
         entityId: rxId,
         after: { policy: ALLERGY_POLICY, matches: matches.map((m) => ({ sku: m.medicineSku, allergyClass: m.allergyClass })) },
       });
-      return { blocked: matches };
+      return { blocked: matches, interactionBlocked: null };
     }
+
+    const medicineIds = items.map((i) => i.medicine_id);
+    const interactions = await interactionsAmong(tx, medicineIds);
+    const majors = interactions.filter((i) => i.severity === 'MAJOR');
+    if (majors.length > 0) {
+      await audit(tx, ctx, { action: 'PRESCRIPTION_INTERACTION_BLOCKED', entityType: 'prescription', entityId: rxId, after: { majorRules: majors.length } });
+      return { blocked: null, interactionBlocked: majors };
+    }
+    if (rx.validity_days === 90) {
+      const notEligible = await chronicIneligible(tx, medicineIds);
+      if (notEligible.length) {
+        throw new AppError(422, 'NOT_CHRONIC_ELIGIBLE', '90-day validity needs chronic-eligible medicines only', notEligible.map((b) => ({ path: `items.${b.name}`, message: 'Not marked chronic-eligible' })));
+      }
+    }
+    const validTill = addDays(istDateOf(now), rx.validity_days);
 
     const seq = await tx.query<{ n: string }>(`SELECT nextval('prescription_number_seq')::text AS n`);
     const issueDay = istDateOf(now);
@@ -401,18 +451,30 @@ export async function issuePrescription(db: Database, doctorId: string, rxId: st
     }
     await tx.query(
       `UPDATE prescriptions SET status = 'ISSUED', rx_number = $2, issued_at = $3, issued_by = $4,
-              valid_till = $5::date, allergy_check = $6::jsonb WHERE id = $1`,
-      [rxId, rxNumber, checkedAt, doctorId, addDays(issueDay, VALID_DAYS), JSON.stringify({ policy: ALLERGY_POLICY, matches: [], checkedAt })],
+              valid_till = $5::date, allergy_check = $6::jsonb, interaction_check = $7::jsonb WHERE id = $1`,
+      [
+        rxId, rxNumber, checkedAt, doctorId, validTill,
+        JSON.stringify({ policy: ALLERGY_POLICY, matches: [], checkedAt }),
+        JSON.stringify({ checkedAt, rules: interactions }),
+      ],
     );
     await audit(tx, ctx, {
       action: 'PRESCRIPTION_ISSUED',
       entityType: 'prescription',
       entityId: rxId,
-      after: { rxNumber, items: items.length, validTill: addDays(issueDay, VALID_DAYS) },
+      after: { rxNumber, items: items.length, validTill, validityDays: rx.validity_days },
     });
-    return { blocked: null };
+    return { blocked: null, interactionBlocked: null };
   });
 
+  if (outcome.interactionBlocked) {
+    throw new AppError(
+      422,
+      'INTERACTION_BLOCKED',
+      'A major drug interaction on this prescription blocks issuing it. Remove one of the medicines.',
+      outcome.interactionBlocked.map((r) => ({ path: 'items', message: `${r.medicines.map((m) => m.name).join(' + ')}: ${r.effect}` })),
+    );
+  }
   if (outcome.blocked) {
     throw new AppError(
       422,
@@ -458,19 +520,38 @@ export async function createReplacement(db: Database, doctorId: string, rxId: st
   return newId;
 }
 
-/** Pharmacy hook for C5. Only a live issued prescription can be marked fulfilled, exactly once. */
+/**
+ * Marks an issued prescription fulfilled, inside the caller's transaction (the pharmacy packs and deducts
+ * stock in the same commit). Only a live issued prescription qualifies, and only once.
+ */
+export async function fulfilInTx(tx: Queryable, rxId: string, ctx: AuditContext, now: Date = new Date()): Promise<void> {
+  const r = await tx.query<{ status: StoredStatus; valid_till: string | null }>(
+    `SELECT status, to_char(valid_till, 'YYYY-MM-DD') AS valid_till FROM prescriptions WHERE id = $1 FOR UPDATE`,
+    [rxId],
+  );
+  const row = r.rows[0];
+  if (!row) throw notFound('Prescription not found');
+  assertDispensable(row.status, row.valid_till, istDateOf(now));
+  await tx.query(`UPDATE prescriptions SET status = 'FULFILLED', fulfilled_at = $2 WHERE id = $1`, [rxId, now.toISOString()]);
+  await audit(tx, ctx, { action: 'PRESCRIPTION_FULFILLED', entityType: 'prescription', entityId: rxId });
+}
+
+/** Standalone form of fulfilInTx, kept for callers outside a pharmacy transaction. */
 export async function markFulfilled(db: Database, rxId: string, ctx: AuditContext, now: Date = new Date()): Promise<void> {
-  await db.transaction(async (tx) => {
-    const r = await tx.query<{ status: StoredStatus; valid_till: string | null }>(
-      `SELECT status, to_char(valid_till, 'YYYY-MM-DD') AS valid_till FROM prescriptions WHERE id = $1 FOR UPDATE`,
-      [rxId],
-    );
-    const row = r.rows[0];
-    if (!row) throw notFound('Prescription not found');
-    assertDispensable(row.status, row.valid_till, istDateOf(now));
-    await tx.query(`UPDATE prescriptions SET status = 'FULFILLED', fulfilled_at = $2 WHERE id = $1`, [rxId, now.toISOString()]);
-    await audit(tx, ctx, { action: 'PRESCRIPTION_FULFILLED', entityType: 'prescription', entityId: rxId });
-  });
+  await db.transaction((tx) => fulfilInTx(tx, rxId, ctx, now));
+}
+
+/** Re-runs the allergy and major-interaction checks at dispensing time. Allergies can change after issue. */
+export async function dispensingChecks(db: Queryable, rxId: string): Promise<{ allergyMatches: AllergyMatch[]; majorInteractions: InteractionView[] }> {
+  const h = (await db.query<{ patient_user_id: string }>('SELECT patient_user_id FROM prescriptions WHERE id = $1', [rxId])).rows[0];
+  if (!h) throw notFound('Prescription not found');
+  const items = await itemsOf(db, rxId);
+  const allergyMatches = matchAllergies(
+    items.map((i) => ({ sku: i.sku, name: i.medicine_name, allergyClass: i.allergy_class })),
+    await activeAllergies(db, h.patient_user_id),
+  );
+  const majorInteractions = (await interactionsAmong(db, items.map((i) => i.medicine_id))).filter((i) => i.severity === 'MAJOR');
+  return { allergyMatches, majorInteractions };
 }
 
 export async function getForDoctor(db: Queryable, doctorId: string, rxId: string): Promise<PrescriptionView> {

@@ -8,7 +8,7 @@ import { useToast } from '../../components/ui/Toast';
 import { apiRequest } from '../../lib/api';
 import { messageOf, useApi } from '../../lib/useApi';
 import type { PageMeta } from '../../types/clinical';
-import type { MedicineOption, Prescription } from './types';
+import type { DrugInteraction, MedicineOption, Prescription } from './types';
 
 interface MedicinesResponse {
   items: MedicineOption[];
@@ -47,6 +47,11 @@ export function PrescriptionEditor({ rx, onChanged }: { rx: Prescription; onChan
   const [errors, setErrors] = useState<Partial<Record<keyof LineForm, string>>>({});
   const [busy, setBusy] = useState(false);
   const [advice, setAdvice] = useState(rx.advice ?? '');
+  const [validityBusy, setValidityBusy] = useState(false);
+  const interactions: DrugInteraction[] = rx.checks?.interactions ?? [];
+  const majors = interactions.filter((i) => i.severity === 'MAJOR');
+  const others = interactions.filter((i) => i.severity !== 'MAJOR');
+  const notEligible = rx.checks?.notChronicEligible ?? [];
   const medicines = useApi<MedicinesResponse>(`/api/v1/medicines?pageSize=8${query ? `&query=${encodeURIComponent(query)}` : ''}`);
 
   useEffect(() => {
@@ -97,6 +102,17 @@ export function PrescriptionEditor({ rx, onChanged }: { rx: Prescription; onChan
     }
   }
 
+  async function setValidity(days: 30 | 90) {
+    setValidityBusy(true);
+    try {
+      onChanged(await apiRequest<Prescription>(`/api/v1/doctor/prescriptions/${rx.id}`, { method: 'PATCH', body: { validityDays: days } }));
+    } catch (err) {
+      toast.notify('error', messageOf(err));
+    } finally {
+      setValidityBusy(false);
+    }
+  }
+
   async function saveAdvice() {
     try {
       onChanged(await apiRequest<Prescription>(`/api/v1/doctor/prescriptions/${rx.id}`, { method: 'PATCH', body: { advice: advice.trim() || null } }));
@@ -118,6 +134,32 @@ export function PrescriptionEditor({ rx, onChanged }: { rx: Prescription; onChan
                 <p key={m.medicineSku}>{m.medicineName} is class {m.allergyClass}, which matches a recorded allergy. Remove it or choose an alternative.</p>
               ))}
             </div>
+          </div>
+        )}
+
+        {majors.length > 0 && (
+          <div role="alert" className="flex gap-4 rounded-2xl border border-rose-300 bg-rose-50 p-5">
+            <AlertTriangle className="mt-0.5 size-6 shrink-0 text-rose-600" aria-hidden="true" />
+            <div className="space-y-1 text-sm text-rose-900">
+              <p className="font-semibold">Major drug interaction: this prescription cannot be issued</p>
+              {majors.map((i) => (
+                <p key={i.medicines.map((m) => m.id).join('-')}>
+                  {i.medicines.map((m) => m.name).join(' + ')}: {i.effect} <span className="text-xs">(source: {i.sourceReference})</span>
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
+        {others.length > 0 && (
+          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-5 text-sm text-amber-900">
+            <p className="font-semibold">Drug interaction notes</p>
+            <ul className="mt-1 space-y-1">
+              {others.map((i) => (
+                <li key={i.medicines.map((m) => m.id).join('-')}>
+                  <span className="font-medium">{i.severity === 'MODERATE' ? 'Moderate' : 'Minor'}:</span> {i.medicines.map((m) => m.name).join(' + ')}. {i.effect} <span className="text-xs">(source: {i.sourceReference})</span>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 
@@ -208,6 +250,29 @@ export function PrescriptionEditor({ rx, onChanged }: { rx: Prescription; onChan
               {rx.checks.blockers.map((b) => <li key={b}>• {b}</li>)}
             </ul>
           )}
+          <div className="mb-5 space-y-2">
+            <p className="text-sm font-medium text-ink">Validity</p>
+            <div role="group" aria-label="Validity" className="flex gap-2">
+              {([30, 90] as const).map((days) => {
+                const blocked = days === 90 && notEligible.length > 0;
+                return (
+                  <button
+                    key={days}
+                    type="button"
+                    aria-pressed={rx.validityDays === days}
+                    disabled={validityBusy || blocked}
+                    onClick={() => setValidity(days)}
+                    className={`min-h-10 flex-1 rounded-xl px-3 text-sm font-semibold ring-1 transition disabled:opacity-50 ${rx.validityDays === days ? 'bg-teal-600 text-white ring-teal-600' : 'bg-white text-ink ring-slate-200 hover:ring-teal-300'}`}
+                  >
+                    {days} days
+                  </button>
+                );
+              })}
+            </div>
+            {notEligible.length > 0 && (
+              <p className="text-xs text-slate-500">90 days is only for chronic-eligible medicines. Not eligible: {notEligible.map((m) => m.name).join(', ')}.</p>
+            )}
+          </div>
           <Button className="w-full" onClick={() => navigate(`/doctor/prescriptions/${rx.id}/preview`)} disabled={rx.items.length === 0}>
             <Eye className="size-4" aria-hidden="true" /> Preview prescription
           </Button>

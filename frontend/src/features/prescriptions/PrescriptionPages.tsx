@@ -13,6 +13,7 @@ import { usePdfDownload } from './usePdfDownload';
 import { Hero } from '../dashboards/RoleDashboard';
 import { PrescriptionDocument } from './PrescriptionDocument';
 import { PrescriptionEditor } from './PrescriptionEditor';
+import { SendToPharmacy, type PatientFulfilment } from './SendToPharmacy';
 import { RxStatusPill } from './RxStatusPill';
 import { RX_STATUS_STYLE } from './types';
 import type { Prescription, PrescriptionSummary } from './types';
@@ -144,7 +145,7 @@ export function PrescriptionPreviewPage() {
       <Modal open={confirming} title="Issue this prescription?" onClose={() => setConfirming(false)}>
         <div className="space-y-4 text-sm">
           <p className="rounded-xl bg-amber-50 p-3 text-amber-900">
-            Once issued, the prescription cannot be edited. It is valid for 30 days from issue. Corrections need a replacement.
+            Once issued, the prescription cannot be edited. It is valid for {rx.validityDays} days from issue. Corrections need a replacement.
           </p>
           <p className="text-slate-700">{rx.patient.name} · {rx.items.length} medicine{rx.items.length === 1 ? '' : 's'}</p>
           <div className="flex justify-end gap-3">
@@ -191,6 +192,7 @@ export function PatientPrescriptionsPage() {
 export function PatientPrescriptionDetailPage() {
   const { prescriptionId = '' } = useParams();
   const loaded = useApi<Prescription>(`/api/v1/patients/me/prescriptions/${prescriptionId}`);
+  const pharmacy = useApi<{ fulfilment: PatientFulfilment | null }>(`/api/v1/patients/me/prescriptions/${prescriptionId}/fulfilment`);
   const pdf = usePdfDownload();
   if (loaded.loading) return <PageLoader label="Opening prescription" />;
   if (loaded.error || !loaded.data) return <ErrorCard message={loaded.error ?? 'Prescription not found.'} back="/patient/prescriptions" />;
@@ -205,6 +207,7 @@ export function PatientPrescriptionDetailPage() {
       {rx.status === 'FULFILLED' && <p role="status" className="rounded-xl bg-sky-50 p-4 text-sm text-sky-900">This prescription has already been fulfilled and cannot be used again.</p>}
       {rx.status === 'SUPERSEDED' && <p role="status" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">Your doctor issued a correction. Use the newer prescription.</p>}
       <PrescriptionDocument rx={rx} onDownload={() => pdf.download(`/api/v1/patients/me/prescriptions/${rx.id}/pdf`, rx.rxNumber)} downloading={pdf.busy} />
+      <SendToPharmacy rxId={rx.id} status={rx.status} fulfilment={pharmacy.data?.fulfilment ?? null} onChanged={pharmacy.reload} />
     </div>
   );
 }

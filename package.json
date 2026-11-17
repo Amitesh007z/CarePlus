@@ -15,6 +15,11 @@
     "test": "npm run test -w backend && npm run test -w frontend",
     "migrate": "npm run migrate -w backend",
     "migrate:status": "npm run migrate:status -w backend",
+    "search:setup": "npm run search -w backend -- setup",
+    "search:reindex": "npm run search -w backend -- reindex",
+    "search:reconcile": "npm run search -w backend -- reconcile",
+    "search:drain": "npm run search -w backend -- drain",
+    "search:status": "npm run search -w backend -- status",
     "e2e": "node e2e/journey.mjs"
   },
   "engines": {

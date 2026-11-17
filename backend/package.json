@@ -12,7 +12,8 @@
     "test": "vitest run",
     "migrate": "tsx src/scripts/migrate.ts",
     "migrate:status": "tsx src/scripts/migrate.ts --status",
-    "seed": "tsx src/scripts/seed.ts"
+    "seed": "tsx src/scripts/seed.ts",
+    "search": "tsx src/scripts/search.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.1",

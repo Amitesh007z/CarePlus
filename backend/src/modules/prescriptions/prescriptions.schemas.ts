@@ -19,7 +19,14 @@ export const itemUpdateSchema = z
 export type ItemCreate = z.infer<typeof itemCreateSchema>;
 export type ItemUpdate = z.infer<typeof itemUpdateSchema>;
 
-export const headerUpdateSchema = z.object({ advice: z.string().trim().max(500).nullable() }).strict();
+/** Draft header. Omitted fields are unchanged. validityDays 90 is further gated by the medicines' chronic flag. */
+export const headerUpdateSchema = z
+  .object({
+    advice: z.string().trim().max(500).nullish(),
+    validityDays: z.union([z.literal(30), z.literal(90)]).optional(),
+  })
+  .strict()
+  .refine((v) => v.advice !== undefined || v.validityDays !== undefined, 'Nothing to update');
 
 export const medicineSearchQuery = z.object({
   query: z.string().trim().max(80).optional(),
