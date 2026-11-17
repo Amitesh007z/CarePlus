@@ -21,18 +21,19 @@ const MAX_BATCH = 1000; // Algolia's documented batch ceiling per request.
 
 /**
  * Thin REST adapter. Plain fetch keeps the dependency surface small and makes the wire format testable.
- * Every call has a hard timeout. Failures become SearchProviderError, which carries a kind and an HTTP
- * status but never the provider's response body, so no provider detail can reach a client.
+ * Every request has a hard timeout. Hosts are tried in order and only a network failure or timeout moves to
+ * the next host; any HTTP answer is final. Failures become SearchProviderError, which carries a kind and an
+ * HTTP status but never the provider's response body.
  */
 export function createAlgoliaProvider(config: AlgoliaConfig, fetchImpl: FetchLike = fetch): SearchProvider {
   const timeout = config.timeoutMs ?? 3000;
-  const writeHost = `https://${config.appId}.algolia.net`;
-  const readHost = `https://${config.appId}-dsn.algolia.net`;
+  // Algolia's documented write hosts, then the read host as a fallback for reads.
+  const writeHosts = [1, 2, 3].map((n) => `https://${config.appId}-${n}.algolianet.com`);
+  const readHosts = [`https://${config.appId}-dsn.algolia.net`, ...writeHosts];
 
-  async function call(host: string, method: 'GET' | 'POST' | 'PUT', path: string, key: string, body?: unknown): Promise<unknown> {
-    let res: Response;
+  async function sendTo(host: string, method: string, path: string, key: string, body: unknown): Promise<Response> {
     try {
-      res = await fetchImpl(`${host}${path}`, {
+      return await fetchImpl(`${host}${path}`, {
         method,
         headers: {
           'X-Algolia-Application-Id': config.appId,
@@ -46,6 +47,20 @@ export function createAlgoliaProvider(config: AlgoliaConfig, fetchImpl: FetchLik
       const name = (err as { name?: string }).name;
       throw new SearchProviderError(name === 'TimeoutError' || name === 'AbortError' ? 'TIMEOUT' : 'UNAVAILABLE');
     }
+  }
+
+  async function call(hosts: string[], method: 'GET' | 'POST' | 'PUT', path: string, key: string, body?: unknown): Promise<unknown> {
+    let res: Response | undefined;
+    let lastErr: SearchProviderError = new SearchProviderError('UNAVAILABLE');
+    for (const host of hosts) {
+      try {
+        res = await sendTo(host, method, path, key, body);
+        break;
+      } catch (err) {
+        lastErr = err as SearchProviderError;
+      }
+    }
+    if (!res) throw lastErr;
     if (!res.ok) {
       const retryable = res.status === 408 || res.status === 429 || res.status >= 500;
       throw new SearchProviderError(retryable ? 'UNAVAILABLE' : 'REJECTED', res.status);
@@ -54,7 +69,7 @@ export function createAlgoliaProvider(config: AlgoliaConfig, fetchImpl: FetchLik
   }
 
   const batch = (index: IndexName, requests: { action: string; body: unknown }[]) =>
-    call(writeHost, 'POST', `/1/indexes/${index}/batch`, config.adminKey, { requests });
+    call(writeHosts, 'POST', `/1/indexes/${index}/batch`, config.adminKey, { requests });
 
   return {
     async saveObjects(index, records: IndexRecord[]) {
@@ -71,7 +86,7 @@ export function createAlgoliaProvider(config: AlgoliaConfig, fetchImpl: FetchLik
     },
 
     async searchIds(index, query, limit) {
-      const out = (await call(readHost, 'POST', `/1/indexes/${index}/query`, config.searchKey ?? config.adminKey, {
+      const out = (await call(readHosts, 'POST', `/1/indexes/${index}/query`, config.searchKey ?? config.adminKey, {
         query,
         page: 0,
         hitsPerPage: Math.min(limit, 1000),
@@ -85,7 +100,7 @@ export function createAlgoliaProvider(config: AlgoliaConfig, fetchImpl: FetchLik
       const ids: string[] = [];
       let cursor: string | undefined;
       do {
-        const page = (await call(readHost, 'POST', `/1/indexes/${index}/browse`, config.adminKey, {
+        const page = (await call(readHosts, 'POST', `/1/indexes/${index}/browse`, config.adminKey, {
           attributesToRetrieve: ['objectID'],
           hitsPerPage: 1000,
           ...(cursor ? { cursor } : {}),
@@ -97,7 +112,7 @@ export function createAlgoliaProvider(config: AlgoliaConfig, fetchImpl: FetchLik
     },
 
     async configure(index) {
-      await call(writeHost, 'PUT', `/1/indexes/${index}/settings`, config.adminKey, INDEX_SETTINGS[index]);
+      await call(writeHosts, 'PUT', `/1/indexes/${index}/settings`, config.adminKey, INDEX_SETTINGS[index]);
     },
   };
 }

@@ -11,27 +11,41 @@ const NAV: Record<Role, { to: string; label: string }[]> = {
   PATIENT: [
     { to: '/patient/dashboard', label: 'Home' },
     { to: '/doctors', label: 'Doctors' },
+    { to: '/care-assistant', label: 'Care assistant' },
+    { to: '/ask', label: 'Ask CarePulse' },
     { to: '/appointments', label: 'Appointments' },
     { to: '/patient/visits', label: 'Visits' },
     { to: '/patient/prescriptions', label: 'Prescriptions' },
     { to: '/medicines', label: 'Medicines' },
+    { to: '/cart', label: 'Cart' },
+    { to: '/orders', label: 'Orders' },
     { to: '/patient/health', label: 'Health' },
     { to: '/patient/profile', label: 'Profile' },
+    { to: '/test-guide', label: 'Test guide' },
   ],
-  DOCTOR: [{ to: '/doctor/dashboard', label: 'Home' }],
+  DOCTOR: [
+    { to: '/doctor/dashboard', label: 'Home' },
+    { to: '/ask', label: 'Ask CarePulse' },
+    { to: '/test-guide', label: 'Test guide' },
+  ],
   PHARMACIST: [
     { to: '/pharmacy/dashboard', label: 'Home' },
-    { to: '/pharmacy/queue', label: 'Queue' },
+    { to: '/pharmacy/orders', label: 'Orders' },
     { to: '/pharmacy/stock', label: 'Stock' },
+    { to: '/ask', label: 'Ask CarePulse' },
+    { to: '/test-guide', label: 'Test guide' },
   ],
   ADMIN: [
     { to: '/admin/dashboard', label: 'Home' },
     { to: '/admin/medicines', label: 'Medicines' },
+    { to: '/admin/knowledge', label: 'Knowledge' },
+    { to: '/ask', label: 'Ask CarePulse' },
+    { to: '/test-guide', label: 'Test guide' },
   ],
 };
 
 const navLink = ({ isActive }: { isActive: boolean }) =>
-  `rounded-xl px-3.5 py-2 text-sm font-medium transition ${
+  `shrink-0 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium transition xl:px-3.5 ${
     isActive ? 'bg-white text-teal-800 shadow-sm ring-1 ring-teal-100' : 'text-slate-600 hover:bg-white/70 hover:text-ink'
   }`;
 
@@ -54,32 +68,35 @@ export function AppLayout() {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-40 border-b border-white/60 bg-white/70 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-          <Link to="/" className="flex items-center gap-2.5">
+        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:gap-4">
+          <Link to="/" className="flex shrink-0 items-center gap-2.5">
             <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-teal-500 to-emerald-500 text-white shadow-md shadow-teal-600/25">
               <HeartPulse className="size-5" aria-hidden="true" />
             </span>
             <span className="text-lg font-bold tracking-tight text-ink">CarePulse</span>
           </Link>
 
-          <nav aria-label="Primary" className="hidden items-center gap-1 md:flex">
-            {links.map((l) => (
-              <NavLink key={l.to} to={l.to} className={navLink}>{l.label}</NavLink>
-            ))}
+          {/* Links scroll inside their own strip instead of pushing the header wider than the screen. */}
+          <nav aria-label="Primary" className="hidden min-w-0 flex-1 md:block">
+            <div className="flex items-center gap-1 overflow-x-auto py-1 [scrollbar-width:thin]">
+              {links.map((l) => (
+                <NavLink key={l.to} to={l.to} className={navLink}>{l.label}</NavLink>
+              ))}
+            </div>
           </nav>
 
-          <div className="flex items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             {status === 'authenticated' && user ? (
               <>
-                <div className="hidden items-center gap-2 lg:flex">
+                <div className="hidden items-center gap-2 xl:flex">
                   <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${ROLE_META[user.role].chip}`}>
                     {ROLE_META[user.role].label}
                   </span>
-                  <span className="max-w-40 truncate text-sm font-medium text-ink">{user.displayName}</span>
+                  <span className="max-w-32 truncate text-sm font-medium text-ink">{user.displayName}</span>
                 </div>
-                <Button variant="secondary" className="min-h-9 px-3 py-1.5" onClick={onSignOut}>
+                <Button variant="secondary" className="min-h-9 px-2.5 py-1.5 sm:px-3" onClick={onSignOut} aria-label="Sign out">
                   <LogOut className="size-4" aria-hidden="true" />
-                  <span>Sign out</span>
+                  <span className="hidden sm:inline">Sign out</span>
                 </Button>
               </>
             ) : status === 'anonymous' ? (

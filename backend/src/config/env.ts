@@ -41,7 +41,20 @@ const schema = z.object({
   ALGOLIA_APP_ID: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).max(64).optional()),
   ALGOLIA_ADMIN_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(8).optional()),
   ALGOLIA_SEARCH_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(8).optional()),
+  // Order confirmation email (optional). Without SMTP_URL, notifications wait durably in the database.
+  SMTP_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().regex(/^smtps?:\/\//, 'must start with smtp:// or smtps://').optional()),
+  SMTP_FROM: z.preprocess((v) => (v === '' ? undefined : v), z.string().email().optional()),
   ALGOLIA_TIMEOUT_MS: z.coerce.number().int().min(200).max(15000).default(3000),
+  // AI (C8 care assistant, C9 knowledge assistant). The key is backend-only and optional: without it the
+  // assistants return their safe fallback and the rest of the application is unaffected.
+  GEMINI_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(8).optional()),
+  // gemini-2.5-* is no longer open to new keys (HTTP 404). gemini-3.1-flash-lite accepts thinkingBudget 0.
+  GEMINI_MODEL: z.string().min(1).max(80).default('gemini-3.1-flash-lite'),
+  GEMINI_EMBEDDING_MODEL: z.string().min(1).max(80).default('gemini-embedding-001'),
+  AI_LLM_TIMEOUT_MS: z.coerce.number().int().min(500).max(30000).default(8000),
+  AI_CARE_RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(500).default(10),
+  AI_CARE_RATE_WINDOW_SEC: z.coerce.number().int().min(60).max(86400).default(600),
+  AI_KNOWLEDGE_RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(500).default(30),
 }).superRefine((v, ctx) => {
   if (v.ALGOLIA_APP_ID && !v.ALGOLIA_ADMIN_API_KEY) {
     ctx.addIssue({ code: 'custom', path: ['ALGOLIA_ADMIN_API_KEY'], message: 'required when ALGOLIA_APP_ID is set' });

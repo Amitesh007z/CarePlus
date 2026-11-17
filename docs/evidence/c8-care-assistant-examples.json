@@ -1,0 +1,157 @@
+{
+  "capturedAt": "2026-11-17T10:33:16.666Z",
+  "model": "gemini-3.1-flash-lite",
+  "provider": "gemini",
+  "note": "Synthetic patient (consent on, penicillin allergy). Live Gemini calls. Amoxicillin-class items are excluded by the allergy filter when present.",
+  "examples": [
+    {
+      "label": "normal",
+      "request": {
+        "message": "I have a dry cough for two days"
+      },
+      "response": {
+        "urgency": "SELF_CARE",
+        "summary": "You are experiencing a dry cough that has persisted for two days. It is advisable to monitor your symptoms and consult a healthcare professional if they worsen or do not improve.",
+        "clarificationRequired": false,
+        "clarificationQuestion": null,
+        "recommendedDoctors": [
+          {
+            "id": "cca33889-f644-40d4-897c-4308495ba066",
+            "displayName": "Dr C8 Rao",
+            "specialty": "General Physician",
+            "experienceYears": 9,
+            "reason": "This general physician can evaluate your respiratory symptoms."
+          },
+          {
+            "id": "f59855b1-1b4e-4b9e-bb5a-49e9f1c73434",
+            "displayName": "Dr C8 Rao",
+            "specialty": "General Physician",
+            "experienceYears": 9,
+            "reason": "This general physician is available to discuss your cough."
+          },
+          {
+            "id": "216f0c83-cf8d-48fc-8f1e-d2ccb0375baf",
+            "displayName": "Dr C8 Rao",
+            "specialty": "General Physician",
+            "experienceYears": 9,
+            "reason": "This general physician can provide guidance on managing your symptoms."
+          }
+        ],
+        "recommendedProducts": [
+          {
+            "id": "76ad1224-147e-486c-988d-28c7f2e0cec5",
+            "sku": "C8MWKJI7VAEJFY",
+            "name": "C8 Cough syrup",
+            "strength": "100 mg",
+            "form": "Syrup",
+            "priceInr": 120,
+            "availability": "IN_STOCK",
+            "rxRequired": false,
+            "reason": "This syrup is formulated for cough and cold relief.",
+            "requiresConfirmation": true
+          },
+          {
+            "id": "831ad36b-61f6-43bb-8123-22710957bd83",
+            "sku": "MED-1005",
+            "name": "Dextromethorphan syrup",
+            "strength": null,
+            "form": "Syrup",
+            "priceInr": 92,
+            "availability": "IN_STOCK",
+            "rxRequired": false,
+            "reason": "This syrup is designed to help manage cough symptoms.",
+            "requiresConfirmation": true
+          },
+          {
+            "id": "f01302ac-1c27-4b73-8ff7-7bf33e0e1554",
+            "sku": "C8MWKJQ9XSF8V",
+            "name": "C8 Cough syrup",
+            "strength": "100 mg",
+            "form": "Syrup",
+            "priceInr": 120,
+            "availability": "IN_STOCK",
+            "rxRequired": false,
+            "reason": "This product is categorized for cough and cold support.",
+            "requiresConfirmation": true
+          }
+        ],
+        "safetyMessage": "Read the label before use. If your symptoms get worse or do not improve, see a doctor.",
+        "disclaimer": "CarePulse's care assistant does not diagnose or treat conditions. It only suggests doctors and over-the-counter items from CarePulse's catalogue. Nothing is booked or added to your cart until you confirm it. It does not replace advice from a doctor.",
+        "followUpRequired": false
+      }
+    },
+    {
+      "label": "clarification",
+      "request": {
+        "message": "I feel off"
+      },
+      "response": {
+        "urgency": "SELF_CARE",
+        "summary": "More information is needed before suggestions can be made.",
+        "clarificationRequired": true,
+        "clarificationQuestion": "What do you need help with? For example, a symptom, or the kind of medicine or doctor you are looking for.",
+        "recommendedDoctors": [],
+        "recommendedProducts": [],
+        "safetyMessage": "No suggestions are shown until your question is clarified.",
+        "disclaimer": "CarePulse's care assistant does not diagnose or treat conditions. It only suggests doctors and over-the-counter items from CarePulse's catalogue. Nothing is booked or added to your cart until you confirm it. It does not replace advice from a doctor.",
+        "followUpRequired": true
+      }
+    },
+    {
+      "label": "no_suitable_match",
+      "request": {
+        "message": "my toenail has turned a strange colour and needs a special fungal treatment"
+      },
+      "response": {
+        "urgency": "SEE_DOCTOR",
+        "summary": "A discolored toenail can be caused by various factors, including trauma or underlying health issues. It is important to have a professional evaluate the nail to determine the cause and discuss appropriate management options.",
+        "clarificationRequired": false,
+        "clarificationQuestion": null,
+        "recommendedDoctors": [
+          {
+            "id": "cca33889-f644-40d4-897c-4308495ba066",
+            "displayName": "Dr C8 Rao",
+            "specialty": "General Physician",
+            "experienceYears": 9,
+            "reason": "This general physician can evaluate the cause of the nail discoloration."
+          },
+          {
+            "id": "f59855b1-1b4e-4b9e-bb5a-49e9f1c73434",
+            "displayName": "Dr C8 Rao",
+            "specialty": "General Physician",
+            "experienceYears": 9,
+            "reason": "This general physician is available to assess the condition of your toenail."
+          },
+          {
+            "id": "216f0c83-cf8d-48fc-8f1e-d2ccb0375baf",
+            "displayName": "Dr C8 Rao",
+            "specialty": "General Physician",
+            "experienceYears": 9,
+            "reason": "This general physician can provide a professional examination of the affected area."
+          }
+        ],
+        "recommendedProducts": [],
+        "safetyMessage": "Consider seeing a doctor. If your symptoms get worse or do not improve, seek medical help promptly.",
+        "disclaimer": "CarePulse's care assistant does not diagnose or treat conditions. It only suggests doctors and over-the-counter items from CarePulse's catalogue. Nothing is booked or added to your cart until you confirm it. It does not replace advice from a doctor.",
+        "followUpRequired": true
+      }
+    },
+    {
+      "label": "emergency",
+      "request": {
+        "message": "Severe chest pain since this morning"
+      },
+      "response": {
+        "urgency": "EMERGENCY",
+        "summary": "Your message may describe an emergency. Please get help now.",
+        "clarificationRequired": false,
+        "clarificationQuestion": null,
+        "recommendedDoctors": [],
+        "recommendedProducts": [],
+        "safetyMessage": "Some of the details you entered may describe an emergency. If you feel very unwell, call your local emergency number now. Do not wait for your appointment. Do not rely on this assistant for an emergency.",
+        "disclaimer": "CarePulse's care assistant does not diagnose or treat conditions. It only suggests doctors and over-the-counter items from CarePulse's catalogue. Nothing is booked or added to your cart until you confirm it. It does not replace advice from a doctor.",
+        "followUpRequired": true
+      }
+    }
+  ]
+}

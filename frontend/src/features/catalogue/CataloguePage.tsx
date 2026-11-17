@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, RotateCcw, Search } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -234,7 +234,7 @@ function MedicineCard({ medicine: m }: { medicine: PublicMedicine }) {
     <li className="flex flex-col gap-3 rounded-2xl bg-white/90 p-5 shadow-sm ring-1 ring-slate-900/5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="font-semibold text-ink">{m.name}</h3>
+          <h3 className="font-semibold text-ink"><Link to={`/medicines/${m.id}`} className="hover:underline">{m.name}</Link></h3>
           <p className="text-xs text-slate-500">{m.sku} · {m.category}</p>
         </div>
         <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${m.rxRequired ? 'bg-indigo-50 text-indigo-800 ring-indigo-200' : 'bg-slate-50 text-slate-700 ring-slate-200'}`}>

@@ -71,7 +71,7 @@ describe('C5 unit: Algolia adapter wire format and failure handling', () => {
     const p = createAlgoliaProvider(config, fn);
     const rec = { objectID: 'a', sku: 'S' } as unknown as IndexRecord;
     await p.saveObjects(INDEX_MEDICINES, [rec]);
-    expect(calls[0]!.url).toBe('https://APPTEST.algolia.net/1/indexes/carepulse_medicines/batch');
+    expect(calls[0]!.url).toBe('https://APPTEST-1.algolianet.com/1/indexes/carepulse_medicines/batch');
     expect(calls[0]!.headers['X-Algolia-API-Key']).toBe('admin-key-value-123');
     expect(calls[0]!.body).toEqual({ requests: [{ action: 'addObject', body: rec }] });
   });

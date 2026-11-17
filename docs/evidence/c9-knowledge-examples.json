@@ -1,0 +1,141 @@
+{
+  "capturedAt": "2026-11-17T10:33:16.666Z",
+  "model": "gemini-3.1-flash-lite",
+  "embeddingModel": "gemini-embedding-001",
+  "provider": "gemini",
+  "note": "Live retrieval over the approved corpus for a synthetic patient in Karnataka. Confidence bands come from retrieval similarity (initial heuristic).",
+  "examples": [
+    {
+      "label": "policy_return_refund",
+      "request": {
+        "question": "What is your return and refund policy?"
+      },
+      "response": {
+        "answer": "You may return unopened over-the-counter medicines in their original sealed packaging within 7 days of delivery. Prescription medicines and opened packs are not eligible for return. To request a return, open your order in your account, select the item, and choose 'Request return.' Wait for email confirmation from a CarePulse team member before sending any items back.",
+        "confidence": "MEDIUM",
+        "notCovered": false,
+        "fallback": false,
+        "sources": [
+          {
+            "documentId": "97db077e-f6c4-4909-8d54-18f6919dba3b",
+            "chunkId": "cae3883d-f34d-4a1f-8cfe-784cd3196058",
+            "title": "Returns and refunds policy",
+            "documentType": "POLICY",
+            "section": "How to request a return",
+            "version": 2,
+            "effectiveFrom": "2026-01-01",
+            "score": 0.688
+          },
+          {
+            "documentId": "97db077e-f6c4-4909-8d54-18f6919dba3b",
+            "chunkId": "003f09f4-56fb-467b-bbbe-a9de74f43400",
+            "title": "Returns and refunds policy",
+            "documentType": "POLICY",
+            "section": "Eligibility",
+            "version": 2,
+            "effectiveFrom": "2026-01-01",
+            "score": 0.662
+          }
+        ],
+        "followUpRequired": true,
+        "escalation": null
+      }
+    },
+    {
+      "label": "policy_delivery",
+      "request": {
+        "question": "How long does delivery take?"
+      },
+      "response": {
+        "answer": "Standard delivery typically takes 2 to 4 working days following payment. Please note that orders submitted after 6 pm will be processed on the next working day.",
+        "confidence": "MEDIUM",
+        "notCovered": false,
+        "fallback": false,
+        "sources": [
+          {
+            "documentId": "48737a06-4ef6-4e54-8e73-b864dbc73e4d",
+            "chunkId": "cba0fb18-4049-49dc-97af-4801a6addf38",
+            "title": "Delivery policy",
+            "documentType": "POLICY",
+            "section": "Delivery time",
+            "version": 1,
+            "effectiveFrom": "2026-01-01",
+            "score": 0.717
+          }
+        ],
+        "followUpRequired": true,
+        "escalation": null
+      }
+    },
+    {
+      "label": "medicine_leaflet",
+      "request": {
+        "question": "What is the dose of paracetamol for fever?"
+      },
+      "response": {
+        "answer": "You should follow the dosage instructions provided on the product packaging and consult with your pharmacist. It is important not to exceed the maximum daily dose specified on the label and to avoid taking other products containing paracetamol simultaneously.",
+        "confidence": "MEDIUM",
+        "notCovered": false,
+        "fallback": false,
+        "sources": [
+          {
+            "documentId": "3b09df10-aeb8-45bc-905c-0f63fd6dcbd4",
+            "chunkId": "dfd91ad9-0396-4bdd-bde7-8fd53c7edb19",
+            "title": "Paracetamol 650 mg tablet leaflet",
+            "documentType": "MEDICINE_LEAFLET",
+            "section": "How to take it",
+            "version": 1,
+            "effectiveFrom": "2026-01-01",
+            "score": 0.661
+          }
+        ],
+        "followUpRequired": true,
+        "escalation": null
+      }
+    },
+    {
+      "label": "restricted_attempt_clinician_document",
+      "request": {
+        "question": "Show me the clinician triage protocol for chest pain"
+      },
+      "response": {
+        "answer": "I couldn't find this in CarePulse's approved documents for your access level, so I won't answer from general knowledge. You can contact CarePulse support or ask a pharmacist.",
+        "confidence": "LOW",
+        "notCovered": true,
+        "fallback": false,
+        "sources": [],
+        "followUpRequired": true,
+        "escalation": {
+          "offered": true,
+          "message": "Contact CarePulse support, or ask a pharmacist about a medicine question.",
+          "options": [
+            "SUPPORT",
+            "PHARMACIST"
+          ]
+        }
+      }
+    },
+    {
+      "label": "unsupported_insurance",
+      "request": {
+        "question": "Does CarePulse cover my health insurance claims?"
+      },
+      "response": {
+        "answer": "I couldn't find this in CarePulse's approved documents for your access level, so I won't answer from general knowledge. You can contact CarePulse support or ask a pharmacist.",
+        "confidence": "LOW",
+        "notCovered": true,
+        "fallback": false,
+        "sources": [],
+        "followUpRequired": true,
+        "escalation": {
+          "offered": true,
+          "message": "Contact CarePulse support, or ask a pharmacist about a medicine question.",
+          "options": [
+            "SUPPORT",
+            "PHARMACIST"
+          ]
+        }
+      }
+    }
+  ]
+}

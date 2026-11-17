@@ -13,7 +13,10 @@
     "migrate": "tsx src/scripts/migrate.ts",
     "migrate:status": "tsx src/scripts/migrate.ts --status",
     "seed": "tsx src/scripts/seed.ts",
-    "search": "tsx src/scripts/search.ts"
+    "search": "tsx src/scripts/search.ts",
+    "slots:enable": "tsx src/scripts/enable-slots.ts",
+    "seed:knowledge": "tsx src/scripts/seed-knowledge.ts",
+    "evidence:ai": "tsx src/scripts/ai-evidence.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.1",
@@ -22,6 +25,7 @@
     "dotenv": "^18.0.10",
     "express": "^5.3.0",
     "helmet": "^8.3.0",
+    "nodemailer": "^10.6.0",
     "pdfkit": "^0.20.2",
     "pg": "^8.23.1",
     "pino": "^10.4.0",
@@ -34,6 +38,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^20.19.43",
+    "@types/nodemailer": "^8.0.2",
     "@types/pdfkit": "^0.17.7",
     "@types/pg": "^8.23.1",
     "@types/supertest": "^7.2.1",

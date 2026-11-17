@@ -2,7 +2,7 @@
 
 Fictional healthcare portal (hackathon project). **All data is synthetic. Not medical advice.**
 
-Stack: React + TypeScript + Vite + Tailwind (frontend), Node.js + TypeScript + Express (API), Neon PostgreSQL accessed with `pg` and plain SQL migrations (no ORM). Algolia is planned for medicine and doctor search, and Neo4j for the AI-B knowledge (RAG) store. There is no Redis. See `docs/architecture/decisions.md`.
+Stack: React + TypeScript + Vite + Tailwind (frontend), Node.js + TypeScript + Express (API), Neon PostgreSQL accessed with `pg` and plain SQL migrations (no ORM). Algolia is used for medicine and doctor search. The AI-B knowledge assistant stores its approved documents and embeddings in Neon with pgvector (no Neo4j). There is no Redis. See `docs/architecture/decisions.md`.
 
 Status: **C2 complete** (profile, health context, consent, doctor directory, slots and appointments). Prescriptions start at C3.
 

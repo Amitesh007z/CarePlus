@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, ClipboardList, Copy, ShieldAlert } from 'lucide-react';
 import { PageLoader } from '../../components/PageLoader';
@@ -17,6 +17,9 @@ import { SendToPharmacy, type PatientFulfilment } from './SendToPharmacy';
 import { RxStatusPill } from './RxStatusPill';
 import { RX_STATUS_STYLE } from './types';
 import type { Prescription, PrescriptionSummary } from './types';
+
+// Loaded on demand: only the patient's issued-prescription page needs the cart action.
+const BuyFromPrescription = lazy(() => import('../commerce/BuyFromPrescription').then((m) => ({ default: m.BuyFromPrescription })));
 
 /** Doctor: a draft opens the editor; an issued or later record opens the read-only document. */
 export function DoctorPrescriptionPage() {
@@ -207,6 +210,9 @@ export function PatientPrescriptionDetailPage() {
       {rx.status === 'FULFILLED' && <p role="status" className="rounded-xl bg-sky-50 p-4 text-sm text-sky-900">This prescription has already been fulfilled and cannot be used again.</p>}
       {rx.status === 'SUPERSEDED' && <p role="status" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">Your doctor issued a correction. Use the newer prescription.</p>}
       <PrescriptionDocument rx={rx} onDownload={() => pdf.download(`/api/v1/patients/me/prescriptions/${rx.id}/pdf`, rx.rxNumber)} downloading={pdf.busy} />
+      <Suspense fallback={null}>
+        <BuyFromPrescription rxId={rx.id} status={rx.status} pharmacyOpen={(pharmacy.data?.fulfilment?.status ?? 'REJECTED') !== 'REJECTED'} />
+      </Suspense>
       <SendToPharmacy rxId={rx.id} status={rx.status} fulfilment={pharmacy.data?.fulfilment ?? null} onChanged={pharmacy.reload} />
     </div>
   );

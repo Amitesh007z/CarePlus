@@ -21,6 +21,11 @@ import { prescriptionsRouter } from './modules/prescriptions/prescriptions.route
 import { catalogueRouter } from './modules/medicines/catalogue.routes.js';
 import { pharmacyRouter } from './modules/pharmacy/pharmacy.routes.js';
 import type { SearchProvider } from './modules/search/search-provider.js';
+import { commerceRouter } from './modules/commerce/commerce.routes.js';
+import type { Mailer } from './modules/commerce/notifications.js';
+import type { LlmProvider } from './modules/ai/llm/provider.js';
+import { careRouter } from './modules/ai/care/care.routes.js';
+import { knowledgeRouter } from './modules/ai/knowledge/knowledge.routes.js';
 
 export interface AppDeps {
   env: Pick<Env, 'APP_ORIGIN'> & Partial<Pick<Env, 'NODE_ENV' | 'SESSION_TTL_HOURS'>>;
@@ -31,11 +36,34 @@ export interface AppDeps {
   limits?: AuthLimits;
   /** Search provider, or null when not configured. Search falls back to PostgreSQL in that case. */
   search?: SearchProvider | null;
+  /** Order confirmation mailer, or null: confirmations then wait durably in the database. */
+  mailer?: Mailer | null;
+  /** LLM provider for the AI assistants, or null when no key is configured. Core routes never depend on it. */
+  llm?: LlmProvider | null;
+  /** Per-patient limit on LLM-backed care requests. */
+  aiCareRateLimit?: { windowSec: number; max: number };
+  /** Per-user limit on knowledge questions. */
+  aiKnowledgeRateLimit?: { windowSec: number; max: number };
+  /** Timeout for each LLM call. */
+  aiTimeoutMs?: number;
 }
 
 export const BODY_LIMIT = '100kb';
 
-export function createApp({ env, db, logger, migrationsDir, hasher, limits, search = null }: AppDeps): Express {
+export function createApp({
+  env,
+  db,
+  logger,
+  migrationsDir,
+  hasher,
+  limits,
+  search = null,
+  mailer = null,
+  llm = null,
+  aiCareRateLimit = { windowSec: 600, max: 10 },
+  aiKnowledgeRateLimit = { windowSec: 600, max: 30 },
+  aiTimeoutMs = 8000,
+}: AppDeps): Express {
   const nodeEnv = env.NODE_ENV ?? 'development';
   const app = express();
   app.disable('x-powered-by');
@@ -96,6 +124,9 @@ export function createApp({ env, db, logger, migrationsDir, hasher, limits, sear
   api.use(prescriptionsRouter({ db, nodeEnv }));
   api.use(catalogueRouter({ db, nodeEnv, search }));
   api.use(pharmacyRouter({ db, nodeEnv }));
+  api.use(commerceRouter({ db, nodeEnv, mailer }));
+  api.use(careRouter({ db, nodeEnv, llm, logger, timeoutMs: aiTimeoutMs, rateLimit: aiCareRateLimit }));
+  api.use(knowledgeRouter({ db, nodeEnv, llm, logger, timeoutMs: aiTimeoutMs, rateLimit: aiKnowledgeRateLimit }));
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);

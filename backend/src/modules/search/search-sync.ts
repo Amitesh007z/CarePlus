@@ -106,6 +106,8 @@ export interface SyncDeps {
   batchSize?: number;
   concurrency?: number;
   now?: () => Date;
+  /** Restrict this drain to these objects. Other queued jobs are left for other drains. */
+  objectIds?: string[];
 }
 
 export interface DrainReport {
@@ -129,12 +131,13 @@ const emptyReport = (): DrainReport => ({ claimed: 0, succeeded: 0, retried: 0, 
  * Claims due jobs. SKIP LOCKED lets several workers run safely. A PROCESSING job whose lease expired
  * (the worker died) is claimable again. Each claim increments attempts.
  */
-async function claim(db: Queryable, now: Date, limit: number): Promise<ClaimedJob[]> {
+async function claim(db: Queryable, now: Date, limit: number, objectIds: string[] | null): Promise<ClaimedJob[]> {
   const r = await db.query<{ id: string; index_name: IndexName; object_id: string; attempts: number }>(
     `WITH due AS (
        SELECT id FROM search_sync_jobs
-        WHERE (status = 'PENDING' AND next_attempt_at <= $1)
-           OR (status = 'PROCESSING' AND locked_until < $1)
+        WHERE ((status = 'PENDING' AND next_attempt_at <= $1)
+           OR (status = 'PROCESSING' AND locked_until < $1))
+          AND ($5::uuid[] IS NULL OR object_id = ANY($5::uuid[]))
         ORDER BY next_attempt_at
         LIMIT $2
         FOR UPDATE SKIP LOCKED)
@@ -142,7 +145,7 @@ async function claim(db: Queryable, now: Date, limit: number): Promise<ClaimedJo
         SET status = 'PROCESSING', attempts = j.attempts + 1, locked_until = $3::timestamptz + make_interval(secs => $4::int)
        FROM due WHERE j.id = due.id
      RETURNING j.id, j.index_name, j.object_id, j.attempts`,
-    [now.toISOString(), limit, now.toISOString(), LEASE_MS / 1000],
+    [now.toISOString(), limit, now.toISOString(), LEASE_MS / 1000, objectIds],
   );
   return r.rows.map((j) => ({ id: j.id, indexName: j.index_name, objectId: j.object_id, attempts: j.attempts }));
 }
@@ -252,7 +255,7 @@ export async function drainSearchSync(deps: SyncDeps): Promise<DrainReport> {
   const total = emptyReport();
   const runner = async (): Promise<void> => {
     for (;;) {
-      const jobs = await claim(deps.db, full.now(), full.batchSize);
+      const jobs = await claim(deps.db, full.now(), full.batchSize, deps.objectIds ?? null);
       if (jobs.length === 0) return;
       const byIndex = new Map<IndexName, ClaimedJob[]>();
       for (const j of jobs) byIndex.set(j.indexName, [...(byIndex.get(j.indexName) ?? []), j]);

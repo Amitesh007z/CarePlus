@@ -13,7 +13,7 @@ import { messageOf, useApi } from '../../lib/useApi';
 import type { PageMeta } from '../../types/clinical';
 import { Hero } from '../dashboards/RoleDashboard';
 import { AVAILABILITY_LABEL, AVAILABILITY_TONE } from '../catalogue/types';
-import { FULFILMENT_LABEL, FULFILMENT_TONE, type FulfilmentAction, type FulfilmentDetail, type Movement, type QueueItem, type StockRow } from './types';
+import { FULFILMENT_LABEL, FULFILMENT_TONE, MOVEMENT_LABEL, type FulfilmentAction, type FulfilmentDetail, type Movement, type QueueItem, type StockRow } from './types';
 
 const VIEWS = [
   { key: 'queue', label: 'Waiting' },
@@ -281,7 +281,8 @@ export function PharmacyStockPage() {
   const toast = useToast();
   const [text, setText] = useState('');
   const [q, setQ] = useState('');
-  const [lowOnly, setLowOnly] = useState(false);
+  const [params] = useSearchParams();
+  const [lowOnly, setLowOnly] = useState(params.get('lowOnly') === 'true');
   const [selected, setSelected] = useState<StockRow | null>(null);
   const [adjusting, setAdjusting] = useState(false);
   const [delta, setDelta] = useState('');
@@ -312,6 +313,7 @@ export function PharmacyStockPage() {
     const change = Number(delta);
     if (!Number.isInteger(change) || change === 0) return setFormError('Enter a whole number of units, for example 20 or -5');
     if (note.trim().length < 3) return setFormError('Say why the stock changed (at least 3 characters)');
+    if (selected && selected.stockOnHand + change < 0) return setFormError(`Stock cannot go below zero (${selected.stockOnHand} on hand)`);
     if (!selected) return;
     setSaving(true);
     setFormError(null);
@@ -362,7 +364,7 @@ export function PharmacyStockPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {stock.data.items.map((r) => (
-                <tr key={r.id}>
+                <tr key={r.id} className={r.availability === 'OUT_OF_STOCK' ? 'bg-rose-50/60' : r.availability === 'LOW_STOCK' ? 'bg-amber-50/60' : undefined} data-availability={r.availability}>
                   <td className="px-4 py-3 font-medium text-ink">{r.name}{!r.active && <span className="ml-2 text-xs text-slate-500">(inactive)</span>}</td>
                   <td className="px-4 py-3 text-slate-600">{r.sku}</td>
                   <td className="px-4 py-3 tabular-nums">{r.stockOnHand}</td>
@@ -390,7 +392,7 @@ export function PharmacyStockPage() {
             <ul className="divide-y divide-slate-100 text-sm">
               {movements.data.items.map((m, i) => (
                 <li key={`${m.createdAt}-${i}`} className="flex flex-wrap justify-between gap-2 py-2.5">
-                  <span className="text-slate-700">{m.reason === 'DISPENSE' ? 'Dispensed' : 'Adjusted'}{m.note ? ` · ${m.note}` : ''}</span>
+                  <span className="text-slate-700">{MOVEMENT_LABEL[m.reason]}{m.note ? ` · ${m.note}` : ''}</span>
                   <span className="tabular-nums">{m.delta > 0 ? `+${m.delta}` : m.delta} → {m.balanceAfter} on hand · {formatDateTime(m.createdAt)}</span>
                 </li>
               ))}
@@ -403,6 +405,13 @@ export function PharmacyStockPage() {
         <form onSubmit={submitAdjust} noValidate className="space-y-4">
           <Input label="Change in units" hint="Use a minus sign to remove stock, for example -5" type="number" inputMode="numeric" value={delta} onChange={(e) => setDelta(e.target.value)} />
           <Input label="Reason" hint="For example: delivery received, damaged, count correction" value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} />
+          {selected && /^-?d+$/.test(delta.trim()) && Number(delta) !== 0 && (
+            <p className={`rounded-xl p-3 text-sm font-medium ${selected.stockOnHand + Number(delta) < 0 ? 'bg-rose-50 text-rose-800' : 'bg-slate-50 text-slate-700'}`}>
+              {selected.stockOnHand + Number(delta) < 0
+                ? `Stock cannot go below zero: ${selected.stockOnHand} on hand`
+                : `Stock after this change: ${selected.stockOnHand} → ${selected.stockOnHand + Number(delta)}`}
+            </p>
+          )}
           {formError && <p role="alert" className="text-sm font-medium text-rose-600">{formError}</p>}
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setAdjusting(false)}>Cancel</Button>

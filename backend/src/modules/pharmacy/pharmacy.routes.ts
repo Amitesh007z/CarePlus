@@ -4,6 +4,8 @@ import { auditContext, pageQuery, parseUuid, send } from '../../common/http.js';
 import type { Database } from '../../infrastructure/database/pool.js';
 import { protect } from '../auth/auth.middleware.js';
 import * as pharmacy from './pharmacy.service.js';
+import { pharmacyDashboard } from './dashboard.service.js';
+import { prescriptionReview } from './prescription-review.service.js';
 
 const queueQuery = pageQuery.extend({ view: z.enum(['queue', 'active', 'done']).default('queue') });
 const actionBody = z
@@ -62,6 +64,16 @@ export function pharmacyRouter({ db, nodeEnv }: { db: Database; nodeEnv: string 
   r.post('/pharmacy/medicines/:id/stock', ...pharmacist, async (req, res) => {
     const body = stockBody.parse(req.body);
     send(req, res, await pharmacy.adjustStock(db, req.auth!.userId, parseUuid(req.params.id), body.delta, body.note, auditContext(req)));
+  });
+
+  // The pharmacist's counts for the home screen. No patient data.
+  r.get('/pharmacy/dashboard/summary', ...pharmacist, async (req, res) => {
+    send(req, res, await pharmacyDashboard(db));
+  });
+
+  // Prescription review: only for prescriptions linked to pharmacy work. Read-only; never diagnosis or notes.
+  r.get('/pharmacy/prescriptions/:rxId', ...pharmacist, async (req, res) => {
+    send(req, res, await prescriptionReview(db, parseUuid(req.params.rxId)));
   });
 
   r.get('/pharmacy/medicines/:id/movements', ...pharmacist, async (req, res) => {

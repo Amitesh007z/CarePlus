@@ -1,5 +1,9 @@
 import { Link } from 'react-router-dom';
-import { CalendarDays, ClipboardList, FileText, HeartPulse, PackageSearch, Pill, ShieldCheck, ShoppingBag, Sparkles, Stethoscope, Users, Boxes, BookOpen, BadgeCheck, Activity, UserRound } from 'lucide-react';
+import { AlertTriangle, Ban, CheckCircle2, ClipboardCheck, PackageX, Truck } from 'lucide-react';
+import { PageLoader } from '../../components/PageLoader';
+import { useApi } from '../../lib/useApi';
+import type { PharmacyDashboard } from '../pharmacy/types';
+import { CalendarDays, ClipboardList, FileText, HeartPulse, Pill, ShieldCheck, ShoppingBag, Sparkles, Stethoscope, Users, BookOpen, Activity, UserRound } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { DoctorQueue } from '../appointments/DoctorQueue';
 import type { SessionUser } from '../../types/auth';
@@ -102,18 +106,35 @@ function DoctorView({ user }: { user: SessionUser }) {
   );
 }
 
+/** Live counts for the pharmacist home. Counts only: no patient data is shown on this screen. */
+function PharmacistTiles() {
+  const stats = useApi<PharmacyDashboard>('/api/v1/pharmacy/dashboard/summary');
+  if (stats.loading) return <PageLoader label="Loading your queue" />;
+  if (stats.error || !stats.data) return <p role="alert" className="text-sm text-rose-700">{stats.error ?? 'Could not load the dashboard.'}</p>;
+  const s = stats.data;
+  const empty = s.awaitingVerification === 0 && s.inProgress === 0;
+  return (
+    <div className="space-y-6">
+      {empty && <p className="rounded-2xl bg-white/80 p-4 text-sm text-slate-600 ring-1 ring-slate-900/5">Nothing is waiting for you right now. New orders appear here as patients place them.</p>}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <LinkTile to="/pharmacy/orders?view=queue" icon={ClipboardCheck} tone="emerald" title="Awaiting verification" text={`${s.awaitingVerification} order${s.awaitingVerification === 1 ? '' : 's'} to check.`} />
+        <LinkTile to="/pharmacy/orders?view=active" icon={Truck} tone="teal" title="In progress" text={`${s.inProgress} packed or out for delivery.`} />
+        <LinkTile to="/pharmacy/orders?view=done" icon={CheckCircle2} tone="indigo" title="Delivered today" text={`${s.deliveredToday} delivered today.`} />
+        <LinkTile to="/pharmacy/orders?view=done" icon={Ban} tone="amber" title="Rejected today" text={`${s.rejectedToday} order${s.rejectedToday === 1 ? '' : 's'} not dispensed today.`} />
+        <LinkTile to="/pharmacy/stock?lowOnly=true" icon={AlertTriangle} tone="amber" title="Low stock" text={`${s.lowStockItems} at or below ${s.lowStockThreshold} units.`} />
+        <LinkTile to="/pharmacy/stock" icon={PackageX} tone="amber" title="Out of stock" text={`${s.outOfStockItems} medicine${s.outOfStockItems === 1 ? '' : 's'} with no units.`} />
+      </div>
+    </div>
+  );
+}
+
 export function PharmacistDashboard() {
   return (
     <RoleDashboard path="/pharmacy/dashboard" role="PHARMACIST">
       {(user) => (
         <div className="space-y-8">
-          <Hero role="PHARMACIST" title={user.displayName} subtitle="Prescription verification, fulfilment and stock, in one queue." />
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <ModuleTile icon={BadgeCheck} tone="emerald" title="Verification queue" text="Prescription orders waiting for checks." checkpoint="Coming in C5" />
-            <ModuleTile icon={PackageSearch} tone="teal" title="Fulfilment" text="Packed, out for delivery, delivered." checkpoint="Coming in C5" />
-            <ModuleTile icon={Boxes} tone="amber" title="Inventory" text="Stock levels and movement history." checkpoint="Coming in C5" />
-            <ModuleTile icon={Sparkles} tone="indigo" title="Agent proposals" text="Optional AI proposals for approval." checkpoint="Stretch (C9)" />
-          </div>
+          <Hero role="PHARMACIST" title={user.displayName} subtitle="Verify orders, check prescriptions, pack and dispatch, and keep stock accurate." />
+          <PharmacistTiles />
         </div>
       )}
     </RoleDashboard>

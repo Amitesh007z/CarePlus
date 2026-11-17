@@ -77,11 +77,61 @@ export interface StockRow {
   availability: Availability;
 }
 
+export type MovementReason = 'ADJUSTMENT' | 'DISPENSE' | 'ORDER' | 'ORDER_RESTORE';
+
+export const MOVEMENT_LABEL: Record<MovementReason, string> = {
+  ADJUSTMENT: 'Adjusted',
+  DISPENSE: 'Dispensed',
+  ORDER: 'Order placed',
+  ORDER_RESTORE: 'Order returned to stock',
+};
+
 export interface Movement {
   delta: number;
   balanceAfter: number;
-  reason: 'ADJUSTMENT' | 'DISPENSE';
+  reason: MovementReason;
   note: string | null;
   fulfilmentId: string | null;
   createdAt: string;
+}
+
+export interface PharmacyDashboard {
+  awaitingVerification: number;
+  inProgress: number;
+  deliveredToday: number;
+  rejectedToday: number;
+  lowStockItems: number;
+  outOfStockItems: number;
+  lowStockThreshold: number;
+}
+
+export interface OrderEvent {
+  action: string;
+  fromStatus: string | null;
+  toStatus: string;
+  actorRole: 'PATIENT' | 'PHARMACIST' | 'SYSTEM' | string;
+  reason: string | null;
+  at: string;
+}
+
+/** Prescription review: medicines, validity, prescriber and checks only. No diagnosis, advice or clinical notes. */
+export interface PrescriptionReview {
+  id: string;
+  rxNumber: string | null;
+  status: 'ISSUED' | 'FULFILLED' | 'EXPIRED' | 'SUPERSEDED' | 'DRAFT' | string;
+  validTill: string | null;
+  issuedAt: string | null;
+  patient: { name: string; age: number };
+  doctor: { name: string; specialty: string; registrationNo: string };
+  items: {
+    lineNo: number;
+    medicineId: string;
+    name: string;
+    strength: string | null;
+    dose: string;
+    frequency: string;
+    durationDays: number;
+    quantity: number;
+  }[];
+  checks: { allergyConflicts: string[]; majorInteractions: { effect: string }[] };
 }
