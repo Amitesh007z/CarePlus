@@ -130,7 +130,7 @@ export async function answerCareMessage(
     throw new AppError(429, 'RATE_LIMITED', 'Too many assistant requests. Please wait a few minutes and try again.');
   }
 
-  if (!deps.llm) return fallbackResponse(log, 'PROVIDER_NOT_CONFIGURED', 0);
+  if (!deps.llm) return fallbackWithDoctors(db, message, log, 'PROVIDER_NOT_CONFIGURED', 0);
 
   // 5. The model extracts facts. Output is validated; invalid output gets one retry, then the fallback.
   const ex = await callStructured<Extraction>(deps.llm, {
@@ -139,7 +139,7 @@ export async function answerCareMessage(
     timeoutMs: deps.timeoutMs,
     schema: extractionSchema,
   });
-  if (!ex.ok) return fallbackResponse(log, ex.reason, ex.attempts);
+  if (!ex.ok) return fallbackWithDoctors(db, message, log, ex.reason, ex.attempts);
   const facts = ex.value;
   const lifeStage = hasLifeStageConstraint(message) || facts.constraints.some(hasLifeStageConstraint);
   const floor = urgencyFloor({ durationDays: facts.durationDays, lifeStageConstraint: lifeStage });
@@ -200,7 +200,7 @@ export async function answerCareMessage(
       return forbiddenClaimIn([r.summary, ...r.doctors.map((d) => d.reason), ...r.products.map((p) => p.reason)]);
     },
   });
-  if (!rank.ok) return fallbackResponse(log, rank.reason, ex.attempts + rank.attempts);
+  if (!rank.ok) return fallbackWithDoctors(db, message, log, rank.reason, ex.attempts + rank.attempts, doctors);
 
   // 13-14 handled by callStructured. Build the response from DATABASE values only. The model contributes wording.
   const docById = new Map(doctors.map((d) => [d.id, d]));
@@ -272,18 +272,65 @@ function noMatchResponse(): CareResponse {
   };
 }
 
-async function fallbackResponse(
-  log: (e: { outcome: AiOutcome; urgency?: Urgency | null; attempts?: number; errorCode?: string | null }) => Promise<void>,
+const FALLBACK_STOPWORDS = new Set([
+  'have', 'having', 'with', 'from', 'that', 'this', 'what', 'need', 'feel', 'feeling', 'since', 'days', 'week', 'weeks',
+  'some', 'very', 'really', 'about', 'there', 'their', 'been', 'into', 'like', 'want', 'help', 'please', 'doctor', 'medicine',
+]);
+
+/** Plain words from the message, no model involved. Used only to match doctor specialties in the fallback. */
+export function fallbackKeywords(message: string): string[] {
+  const words = message.toLowerCase().match(/[a-z]{4,}/g) ?? [];
+  return [...new Set(words.filter((w) => !FALLBACK_STOPWORDS.has(w)))].slice(0, 5);
+}
+
+/**
+ * When the model is unavailable (timeout, outage, or no key), the patient still gets doctors they can book: specialty
+ * matches on plain words from the message, else general physicians. Medicines are never suggested here, because picking
+ * one needs the model's reading of the message. Invalid model output does not use this path.
+ */
+async function fallbackWithDoctors(
+  db: Database,
+  message: string,
+  log: (e: { outcome: AiOutcome; urgency?: Urgency | null; attempts?: number; errorCode?: string | null; candidates?: number; recommended?: number }) => Promise<void>,
   reason: StructuredFailure | 'PROVIDER_NOT_CONFIGURED',
   attempts: number,
+  known?: DoctorCandidate[],
 ): Promise<CareResponse> {
-  await log({ outcome: 'FALLBACK', urgency: 'SEE_DOCTOR', attempts, errorCode: reason });
+  if (reason === 'INVALID') return fallbackResponse(log, reason, attempts);
+  let doctors: DoctorCandidate[] = known ?? [];
+  if (!known) {
+    try {
+      doctors = await findDoctorCandidates(db, fallbackKeywords(message));
+    } catch {
+      doctors = [];
+    }
+  }
+  return fallbackResponse(log, reason, attempts, doctors.slice(0, 3));
+}
+
+async function fallbackResponse(
+  log: (e: { outcome: AiOutcome; urgency?: Urgency | null; attempts?: number; errorCode?: string | null; candidates?: number; recommended?: number }) => Promise<void>,
+  reason: StructuredFailure | 'PROVIDER_NOT_CONFIGURED',
+  attempts: number,
+  doctors: DoctorCandidate[] = [],
+): Promise<CareResponse> {
+  await log({ outcome: 'FALLBACK', urgency: 'SEE_DOCTOR', attempts, errorCode: reason, candidates: doctors.length, recommended: doctors.length });
+  const recommendedDoctors: RecommendedDoctor[] = doctors.map((d) => ({
+    id: d.id,
+    displayName: d.displayName,
+    specialty: d.specialty,
+    experienceYears: d.experienceYears,
+    reason: 'Suggested without the assistant: a doctor you can book who may be able to help.',
+  }));
   return {
     urgency: 'SEE_DOCTOR',
-    summary: 'The care assistant could not prepare suggestions right now. You can browse doctors or the medicine catalogue directly, or try again later.',
+    summary:
+      recommendedDoctors.length > 0
+        ? 'The care assistant could not prepare suggestions right now, so these doctors were found without it. Medicine suggestions need the assistant and are not shown. You can also browse the catalogue or try again later.'
+        : 'The care assistant could not prepare suggestions right now. You can browse doctors or the medicine catalogue directly, or try again later.',
     clarificationRequired: false,
     clarificationQuestion: null,
-    recommendedDoctors: [],
+    recommendedDoctors,
     recommendedProducts: [],
     safetyMessage: `${EMERGENCY_GUIDANCE} If you are worried about your health, speak to a doctor.`,
     disclaimer: DISCLAIMER,
