@@ -7,11 +7,17 @@ import { useAuth } from '../../lib/auth-context';
 import { ROLE_META } from '../../types/auth';
 import { AuthShell } from './AuthShell';
 
-const DEMO_ACCOUNTS = [
-  { label: 'Patient · Anita', email: 'anita.rao@example.com' },
-  { label: 'Patient · Vikram', email: 'vikram.s@example.com' },
-  { label: 'Doctor · Dr. Mehta', email: 'dr.mehta@example.com' },
-  { label: 'Admin', email: 'admin@example.com' },
+/**
+ * Local demo accounts shown only in dev builds. Accounts without a `password` use a
+ * different secret (the pharmacist's SEED_PHARMACIST_PASSWORD from backend/.env), so the
+ * password is left blank for the user to type. Never hard-code that secret here.
+ */
+const DEMO_ACCOUNTS: { label: string; email: string; password?: string }[] = [
+  { label: 'Patient · Anita', email: 'anita.rao@example.com', password: 'Demo@1234' },
+  { label: 'Patient · Vikram', email: 'vikram.s@example.com', password: 'Demo@1234' },
+  { label: 'Doctor · Dr. Mehta', email: 'dr.mehta@example.com', password: 'Demo@1234' },
+  { label: 'Pharmacist', email: 'pharmacist@example.com' },
+  { label: 'Admin', email: 'admin@example.com', password: 'Demo@1234' },
 ];
 
 interface LoginErrors {
@@ -107,6 +113,9 @@ export default function LoginPage() {
       {import.meta.env.DEV && (
         <div className="mt-8 rounded-2xl border border-dashed border-teal-200 bg-teal-50/60 p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-teal-800">Local demo accounts (synthetic)</p>
+          <p className="mt-1 text-xs text-slate-500">
+            The pharmacist password is the SEED_PHARMACIST_PASSWORD value in backend/.env. Type it in yourself.
+          </p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {DEMO_ACCOUNTS.map((a) => (
               <button
@@ -114,7 +123,9 @@ export default function LoginPage() {
                 type="button"
                 onClick={() => {
                   setIdentifier(a.email);
-                  setPassword('Demo@1234');
+                  setPassword(a.password ?? '');
+                  setFieldErrors({});
+                  setFormError(null);
                 }}
                 className="rounded-lg bg-white px-3 py-2 text-left text-xs text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:ring-teal-300"
               >
