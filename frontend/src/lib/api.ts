@@ -38,17 +38,26 @@ export interface RequestOptions {
   headers?: Record<string, string>;
 }
 
+// Held in memory only (never localStorage). Sent on state-changing requests; the server re-checks it.
+let csrfToken: string | null = null;
+
+export function setCsrfToken(token: string | null): void {
+  csrfToken = token;
+}
+
 /** Typed JSON request. Resolves with `data`; rejects with ApiError. Cookies are sent for session auth. */
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const method = options.method ?? 'GET';
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
-      method: options.method ?? 'GET',
+      method,
       credentials: 'include',
       signal: options.signal,
       headers: {
         Accept: 'application/json',
         ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(method !== 'GET' && csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
         ...options.headers,
       },
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,

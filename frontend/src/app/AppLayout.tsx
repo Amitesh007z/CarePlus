@@ -1,48 +1,103 @@
 import { Suspense, useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { HeartPulse, LogOut, Menu } from 'lucide-react';
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { PageLoader } from '../components/PageLoader';
+import { Button } from '../components/ui/Button';
+import { useToast } from '../components/ui/Toast';
+import { useAuth } from '../lib/auth-context';
+import { ROLE_META } from '../types/auth';
 
-// Navigation foundation. Role-specific entries are added with the auth checkpoint.
-const NAV = [{ to: '/', label: 'Home', end: true }];
-
-const linkClass = ({ isActive }: { isActive: boolean }) =>
-  `rounded-md px-3 py-2 text-sm font-medium ${isActive ? 'bg-brand-100 text-brand-700' : 'text-ink hover:bg-slate-100'}`;
+const navLink = ({ isActive }: { isActive: boolean }) =>
+  `rounded-xl px-3.5 py-2 text-sm font-medium transition ${
+    isActive ? 'bg-white text-teal-800 shadow-sm ring-1 ring-teal-100' : 'text-slate-600 hover:bg-white/70 hover:text-ink'
+  }`;
 
 export function AppLayout() {
+  const { status, user, logout } = useAuth();
+  const navigate = useNavigate();
+  const toast = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  async function onSignOut() {
+    try {
+      await logout();
+      navigate('/login', { replace: true });
+    } catch {
+      toast.notify('error', 'Sign-out failed. Please try again.');
+    }
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <NavLink to="/" className="text-lg font-bold tracking-tight text-brand-600">
-            CarePulse
-          </NavLink>
-          <button
-            type="button"
-            className="rounded-md p-2 text-ink ring-1 ring-slate-300 md:hidden"
-            aria-label="Toggle navigation"
-            aria-expanded={menuOpen}
-            aria-controls="primary-nav"
-            onClick={() => setMenuOpen((o) => !o)}
-          >
-            ☰
-          </button>
-          <nav id="primary-nav" aria-label="Primary" className={`${menuOpen ? 'flex' : 'hidden'} absolute inset-x-0 top-14 flex-col gap-1 border-b border-slate-200 bg-white p-3 md:static md:flex md:flex-row md:border-0 md:p-0`}>
-            {NAV.map((item) => (
-              <NavLink key={item.to} to={item.to} end={item.end} className={linkClass} onClick={() => setMenuOpen(false)}>
-                {item.label}
+      <header className="sticky top-0 z-40 border-b border-white/60 bg-white/70 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
+          <Link to="/" className="flex items-center gap-2.5">
+            <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-teal-500 to-emerald-500 text-white shadow-md shadow-teal-600/25">
+              <HeartPulse className="size-5" aria-hidden="true" />
+            </span>
+            <span className="text-lg font-bold tracking-tight text-ink">CarePulse</span>
+          </Link>
+
+          <nav aria-label="Primary" className="hidden items-center gap-1 md:flex">
+            {user && (
+              <NavLink to={ROLE_META[user.role].dashboardPath} className={navLink}>
+                Dashboard
               </NavLink>
-            ))}
+            )}
           </nav>
+
+          <div className="flex items-center gap-2">
+            {status === 'authenticated' && user ? (
+              <>
+                <div className="hidden items-center gap-2 sm:flex">
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${ROLE_META[user.role].chip}`}>
+                    {ROLE_META[user.role].label}
+                  </span>
+                  <span className="max-w-40 truncate text-sm font-medium text-ink">{user.displayName}</span>
+                </div>
+                <Button variant="secondary" className="min-h-9 px-3 py-1.5" onClick={onSignOut}>
+                  <LogOut className="size-4" aria-hidden="true" />
+                  <span>Sign out</span>
+                </Button>
+              </>
+            ) : status === 'anonymous' ? (
+              <>
+                <Link to="/login" className={navLink({ isActive: false })}>
+                  Sign in
+                </Link>
+                <Link to="/register" className="rounded-xl bg-gradient-to-r from-teal-600 to-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-teal-600/20">
+                  Create account
+                </Link>
+              </>
+            ) : null}
+            <button
+              type="button"
+              className="rounded-xl p-2 text-ink ring-1 ring-slate-200 md:hidden"
+              aria-label="Toggle navigation"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((o) => !o)}
+            >
+              <Menu className="size-5" aria-hidden="true" />
+            </button>
+          </div>
         </div>
+        {menuOpen && user && (
+          <nav aria-label="Mobile" className="border-t border-white/60 bg-white/90 px-4 py-3 md:hidden">
+            <NavLink to={ROLE_META[user.role].dashboardPath} className={navLink} onClick={() => setMenuOpen(false)}>
+              Dashboard
+            </NavLink>
+          </nav>
+        )}
       </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
+
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:py-10">
         <Suspense fallback={<PageLoader />}>
           <Outlet />
         </Suspense>
       </main>
-      <footer className="border-t border-slate-200 py-4 text-center text-xs text-slate-500">
-        CarePulse is a fictional demo using synthetic data. Not medical advice.
+
+      <footer className="px-4 pb-8 text-center text-xs text-slate-500">
+        CarePulse is a fictional demo with synthetic data. It is not medical advice and not a clinical product.
       </footer>
     </div>
   );

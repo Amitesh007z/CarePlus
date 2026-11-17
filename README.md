@@ -2,9 +2,19 @@
 
 Fictional healthcare portal (hackathon project). **All data is synthetic. Not medical advice.**
 
-Stack: React + TypeScript + Vite + Tailwind (frontend), Node.js + TypeScript + Express (API), Neon PostgreSQL accessed with `pg` and plain SQL migrations (no ORM). Algolia is planned for medicine and doctor search. There is no Redis.
+Stack: React + TypeScript + Vite + Tailwind (frontend), Node.js + TypeScript + Express (API), Neon PostgreSQL accessed with `pg` and plain SQL migrations (no ORM). Algolia is planned for medicine and doctor search, and Neo4j for the AI-B knowledge (RAG) store. There is no Redis. See `docs/architecture/decisions.md`.
 
-Status: **C0 foundation only.** No business features yet.
+Status: **C1 complete** (foundation plus authentication and role shells). Business modules start at C2.
+
+## Authentication (C1)
+
+- Patient self-registration only. The API rejects any `role` field, so privileged accounts can't be created publicly.
+- Login by email or mobile, with a generic failure message and per-IP and per-identifier rate limits stored in PostgreSQL.
+- Argon2id password hashing (`@node-rs/argon2`). Hashes are rehashed automatically when parameters change.
+- Server-side sessions. Only the SHA-256 of the cookie token is stored. The cookie is HttpOnly and expires after `SESSION_TTL_HOURS`. Login rotates the session. Logout revokes it server-side.
+- Production cookie is `__Host-cp_sid`, Secure, SameSite=None, for the cross-site Vercel and Render setup. Local dev uses `cp_sid`, SameSite=Lax.
+- CSRF: writes must send `X-CSRF-Token`, which is returned by `/auth/login`, `/auth/register` and `/auth/me` and held in memory only. Foreign `Origin` headers are rejected.
+- Seed: `npm run seed` creates the synthetic demo accounts. The pharmacist needs `SEED_PHARMACIST_PASSWORD`.
 
 ## Requirements
 

@@ -33,7 +33,7 @@ describe('getMigrationStatus', () => {
       t.includes('to_regclass') ? [{ t: 'schema_migrations' }] : [{ name: '0001_foundation.sql', checksum: 'stale' }],
     );
     const s = await getMigrationStatus(db);
-    expect(s.pending).toEqual([]);
+    expect(s.pending).not.toContain('0001_foundation.sql');
     expect(s.drifted).toEqual(['0001_foundation.sql']);
   });
 });

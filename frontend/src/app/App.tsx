@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { createBrowserRouter, RouterProvider, type RouteObject } from 'react-router-dom';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ToastProvider } from '../components/ui/Toast';
+import { AuthProvider } from './AuthProvider';
 import { routes as defaultRoutes } from './routes';
 
 export function App({ routes = defaultRoutes }: { routes?: RouteObject[] }) {
@@ -9,7 +10,9 @@ export function App({ routes = defaultRoutes }: { routes?: RouteObject[] }) {
   return (
     <ErrorBoundary>
       <ToastProvider>
-        <RouterProvider router={router} />
+        <AuthProvider>
+          <RouterProvider router={router} />
+        </AuthProvider>
       </ToastProvider>
     </ErrorBoundary>
   );

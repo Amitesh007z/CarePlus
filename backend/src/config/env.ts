@@ -34,6 +34,7 @@ const schema = z.object({
   DATABASE_URL: postgresUrl,
   DIRECT_DATABASE_URL: z.preprocess((v) => (v === '' ? undefined : v), postgresUrl.optional()),
   DB_POOL_MAX: z.coerce.number().int().min(1).max(50).default(10),
+  SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(168).default(8),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
 
