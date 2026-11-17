@@ -9,3 +9,7 @@ coverage/
 .DS_Store
 .vite/
 .vercel/
+
+# E2E artefacts
+e2e/screenshots/
+e2e/out/

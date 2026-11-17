@@ -14,9 +14,13 @@
     "lint": "npm run lint -w backend && npm run lint -w frontend",
     "test": "npm run test -w backend && npm run test -w frontend",
     "migrate": "npm run migrate -w backend",
-    "migrate:status": "npm run migrate:status -w backend"
+    "migrate:status": "npm run migrate:status -w backend",
+    "e2e": "node e2e/journey.mjs"
   },
   "engines": {
     "node": ">=20.11"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.65.1"
   }
 }

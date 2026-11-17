@@ -14,6 +14,7 @@ import { Hero } from '../dashboards/RoleDashboard';
 import { PrescriptionDocument } from './PrescriptionDocument';
 import { PrescriptionEditor } from './PrescriptionEditor';
 import { RxStatusPill } from './RxStatusPill';
+import { RX_STATUS_STYLE } from './types';
 import type { Prescription, PrescriptionSummary } from './types';
 
 /** Doctor: a draft opens the editor; an issued or later record opens the read-only document. */
@@ -50,7 +51,7 @@ export function DoctorPrescriptionPage() {
       <Link to={`/doctor/consultations/${rx.consultationId}`} className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-800 hover:underline">
         <ArrowLeft className="size-4" aria-hidden="true" /> Consultation
       </Link>
-      <Hero role="DOCTOR" title={rx.status === 'DRAFT' ? 'Prescription draft' : `Prescription ${rx.rxNumber ?? ''}`} subtitle={`For ${rx.patient.name}`} chips={[rx.status === 'DRAFT' ? 'Draft' : rx.status.toLowerCase()]} />
+      <Hero role="DOCTOR" title={rx.status === 'DRAFT' ? 'Prescription draft' : `Prescription ${rx.rxNumber ?? ''}`} subtitle={`For ${rx.patient.name}`} chips={[RX_STATUS_STYLE[rx.status].label]} />
 
       {rx.status === 'DRAFT' ? (
         <PrescriptionEditor rx={rx} onChanged={setCurrent} />
@@ -199,7 +200,7 @@ export function PatientPrescriptionDetailPage() {
       <Link to="/patient/prescriptions" className="inline-flex items-center gap-1.5 text-sm font-medium text-teal-800 hover:underline">
         <ArrowLeft className="size-4" aria-hidden="true" /> All prescriptions
       </Link>
-      <Hero role="PATIENT" title={`Prescription ${rx.rxNumber ?? ''}`} subtitle={`From ${rx.doctor.name}, ${rx.doctor.specialty}`} chips={[rx.status.toLowerCase()]} />
+      <Hero role="PATIENT" title={`Prescription ${rx.rxNumber ?? ''}`} subtitle={`From ${rx.doctor.name}, ${rx.doctor.specialty}`} chips={[RX_STATUS_STYLE[rx.status].label]} />
       {rx.status === 'EXPIRED' && <p role="status" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-800">This prescription has expired. Ask your doctor for a new one.</p>}
       {rx.status === 'FULFILLED' && <p role="status" className="rounded-xl bg-sky-50 p-4 text-sm text-sky-900">This prescription has already been fulfilled and cannot be used again.</p>}
       {rx.status === 'SUPERSEDED' && <p role="status" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">Your doctor issued a correction. Use the newer prescription.</p>}

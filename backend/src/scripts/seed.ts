@@ -90,6 +90,36 @@ try {
       throw err;
     }
   }
+  // Anita's recorded health context from the brief: penicillin allergy and mild asthma. Idempotent.
+  const anita = await client.query<{ id: string }>(`SELECT id FROM users WHERE email = 'anita.rao@example.com'`);
+  if (anita.rows[0]) {
+    await client.query(
+      `INSERT INTO health_info (patient_user_id, type, name, allergy_class, severity, noted_on)
+       SELECT $1, 'ALLERGY', 'Penicillin', 'Penicillin', NULL, '2015-03-10'
+        WHERE NOT EXISTS (SELECT 1 FROM health_info WHERE patient_user_id = $1 AND type = 'ALLERGY' AND lower(name) = 'penicillin')`,
+      [anita.rows[0].id],
+    );
+    await client.query(
+      `INSERT INTO health_info (patient_user_id, type, name, severity, noted_on)
+       SELECT $1, 'CONDITION', 'Mild asthma', 'MILD', '2018-07-01'
+        WHERE NOT EXISTS (SELECT 1 FROM health_info WHERE patient_user_id = $1 AND type = 'CONDITION' AND lower(name) = 'mild asthma')`,
+      [anita.rows[0].id],
+    );
+    console.log('health context: Anita penicillin allergy and mild asthma ensured');
+  }
+  // Dr. Mehta's synthetic weekly hours so the demo can be booked. Idempotent per weekday.
+  const mehta = await client.query<{ id: string }>(`SELECT id FROM users WHERE email = 'dr.mehta@example.com'`);
+  if (mehta.rows[0]) {
+    for (let weekday = 0; weekday <= 6; weekday++) {
+      await client.query(
+        `INSERT INTO doctor_availability (doctor_user_id, weekday, start_time, end_time, slot_minutes)
+         SELECT $1, $2, '09:00', '17:00', 30
+          WHERE NOT EXISTS (SELECT 1 FROM doctor_availability WHERE doctor_user_id = $1 AND weekday = $2)`,
+        [mehta.rows[0].id, weekday],
+      );
+    }
+    console.log('availability: Dr. Mehta weekly hours 09:00-17:00 (30-minute slots) ensured');
+  }
 } finally {
   await client.end();
 }
