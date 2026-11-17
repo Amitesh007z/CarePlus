@@ -13,6 +13,9 @@ import { originGuard } from './modules/auth/auth.middleware.js';
 import { createPasswordHasher, type PasswordHasher } from './modules/auth/password.js';
 import { dashboardsRouter } from './modules/dashboards/dashboards.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
+import { patientsRouter } from './modules/patients/patients.routes.js';
+import { doctorsRouter } from './modules/doctors/doctors.routes.js';
+import { appointmentsRouter } from './modules/appointments/appointments.routes.js';
 
 export interface AppDeps {
   env: Pick<Env, 'APP_ORIGIN'> & Partial<Pick<Env, 'NODE_ENV' | 'SESSION_TTL_HOURS'>>;
@@ -79,6 +82,9 @@ export function createApp({ env, db, logger, migrationsDir, hasher, limits }: Ap
     }),
   );
   api.use(dashboardsRouter({ db, nodeEnv }));
+  api.use(patientsRouter({ db, nodeEnv }));
+  api.use(doctorsRouter({ db, nodeEnv }));
+  api.use(appointmentsRouter({ db, nodeEnv }));
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);

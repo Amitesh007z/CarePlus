@@ -4,7 +4,15 @@ Fictional healthcare portal (hackathon project). **All data is synthetic. Not me
 
 Stack: React + TypeScript + Vite + Tailwind (frontend), Node.js + TypeScript + Express (API), Neon PostgreSQL accessed with `pg` and plain SQL migrations (no ORM). Algolia is planned for medicine and doctor search, and Neo4j for the AI-B knowledge (RAG) store. There is no Redis. See `docs/architecture/decisions.md`.
 
-Status: **C1 complete** (foundation plus authentication and role shells). Business modules start at C2.
+Status: **C2 complete** (profile, health context, consent, doctor directory, slots and appointments). Prescriptions start at C3.
+
+## Patient profile, consent and appointments (C2)
+
+- Profile, structured allergies and conditions, medications and consent live in their own tables. Withdrawal is an explicit, audited state. See `docs/security/consent-and-access.md` for what withdrawal changes.
+- Doctors are discovered through a public directory that exposes no registration number or contact details. Slots are generated lazily from weekly IST availability rules, 14 days at a time.
+- Booking locks the slot row inside a transaction. A partial unique index guarantees one active appointment per slot. Six simultaneous bookings yield exactly one.
+- Cancelling inside 2 hours forfeits the INR 100 booking fee. This fee is **simulated**: no payment is taken or refunded.
+- Sensitive changes are written to an append-only `audit_logs` table.
 
 ## Authentication (C1)
 

@@ -1,9 +1,20 @@
-import { CalendarDays, ClipboardList, FileText, HeartPulse, PackageSearch, Pill, ShieldCheck, ShoppingBag, Sparkles, Stethoscope, Users, Boxes, BookOpen, BadgeCheck, Activity } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { CalendarDays, ClipboardList, FileText, HeartPulse, PackageSearch, Pill, ShieldCheck, ShoppingBag, Sparkles, Stethoscope, Users, Boxes, BookOpen, BadgeCheck, Activity, UserRound } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
+import { DoctorAppointments } from '../appointments/DoctorAppointments';
 import type { SessionUser } from '../../types/auth';
 import { Hero, InfoRow, ModuleTile, RoleDashboard } from './RoleDashboard';
 
 const firstName = (name: string) => name.split(' ').find((p) => !/^(dr\.?|mr\.?|ms\.?|mrs\.?)$/i.test(p)) ?? name;
+
+/** A tile that opens a live page. Unbuilt modules use plain ModuleTile with their checkpoint label. */
+function LinkTile(props: { to: string; icon: Parameters<typeof ModuleTile>[0]['icon']; tone: Parameters<typeof ModuleTile>[0]['tone']; title: string; text: string }) {
+  return (
+    <Link to={props.to} className="block rounded-2xl focus-visible:outline-2">
+      <ModuleTile icon={props.icon} tone={props.tone} title={props.title} text={props.text} checkpoint="Open →" />
+    </Link>
+  );
+}
 
 export function PatientDashboard() {
   return (
@@ -20,46 +31,33 @@ function PatientView({ user }: { user: SessionUser }) {
       <Hero
         role="PATIENT"
         title={`Hello, ${firstName(user.displayName)}`}
-        subtitle="Your appointments, prescriptions and orders live here. Modules light up as they are built."
+        subtitle="Book a visit, keep your health details current and see your appointments in one place."
         chips={[
           p ? `${p.age} years` : '',
           p?.bloodGroup && p.bloodGroup !== 'UNKNOWN' ? `Blood group ${p.bloodGroup}` : '',
-          p?.consentStatus ? 'Health-data consent on file' : 'Consent missing',
+          p?.consentStatus ? 'Health-data consent on file' : 'Consent withdrawn',
         ].filter(Boolean)}
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <ModuleTile icon={CalendarDays} tone="teal" title="Appointments" text="Book and track doctor visits." checkpoint="Coming in C2" />
-        <ModuleTile icon={Stethoscope} tone="indigo" title="Visits & diagnoses" text="Your consultation history." checkpoint="Coming in C2" />
+        <LinkTile to="/doctors" icon={Stethoscope} tone="indigo" title="Find a doctor" text="Browse doctors and book a time." />
+        <LinkTile to="/appointments" icon={CalendarDays} tone="teal" title="Appointments" text="Upcoming visits, history, reschedule or cancel." />
+        <LinkTile to="/patient/health" icon={HeartPulse} tone="rose" title="Health & privacy" text="Allergies, conditions, medicines and consent." />
+        <LinkTile to="/patient/profile" icon={UserRound} tone="emerald" title="My profile" text="Personal, address and emergency details." />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
         <ModuleTile icon={FileText} tone="emerald" title="Prescriptions" text="Digital prescriptions with PDF." checkpoint="Coming in C3" />
         <ModuleTile icon={ShoppingBag} tone="amber" title="Medicine orders" text="Buy exactly what you were prescribed." checkpoint="Coming in C4" />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2" title="Your profile" description="Stored securely. Only you and your treating team can see clinical details.">
-          <dl className="grid gap-x-8 divide-y divide-slate-100 sm:grid-cols-2 sm:divide-y-0">
-            <div className="sm:col-span-1 sm:divide-y sm:divide-slate-100">
-              <InfoRow label="Email" value={user.email} />
-              <InfoRow label="Mobile" value={user.mobile ? `+91 ${user.mobile}` : ''} />
-              <InfoRow label="Date of birth" value={p?.dob ?? ''} />
-              <InfoRow label="Gender" value={p?.gender ?? ''} />
-            </div>
-            <div className="sm:col-span-1 sm:divide-y sm:divide-slate-100">
-              <InfoRow label="Address" value={p ? `${p.addressLine}, ${p.city}, ${p.state} ${p.pincode}` : ''} />
-              <InfoRow label="Emergency contact" value={p ? `${p.emergencyContactName} · ${p.emergencyContactPhone}` : ''} />
-              <InfoRow label="Consent recorded" value={p?.consentAt ? new Date(p.consentAt).toLocaleDateString('en-IN', { dateStyle: 'medium' }) : ''} />
-            </div>
-          </dl>
-        </Card>
-
-        <Card title="Safety" description="Medicine safety is checked before anything is recommended or ordered.">
-          <ul className="space-y-3 text-sm text-slate-600">
-            <li className="flex gap-3"><ShieldCheck className="mt-0.5 size-4 shrink-0 text-teal-600" aria-hidden="true" />Allergies are checked against every prescription.</li>
-            <li className="flex gap-3"><Sparkles className="mt-0.5 size-4 shrink-0 text-teal-600" aria-hidden="true" />The care assistant gives guidance only, never a diagnosis.</li>
-            <li className="flex gap-3"><HeartPulse className="mt-0.5 size-4 shrink-0 text-rose-500" aria-hidden="true" />For emergencies, call your local emergency number.</li>
-          </ul>
-        </Card>
-      </div>
+      <Card title="Safety" description="Medicine safety is checked before anything is recommended or ordered.">
+        <ul className="grid gap-3 text-sm text-slate-600 sm:grid-cols-3">
+          <li className="flex gap-3 rounded-xl bg-slate-50 p-3"><ShieldCheck className="mt-0.5 size-4 shrink-0 text-teal-600" aria-hidden="true" />Your allergies are shown to your doctor and checked before you are offered a medicine.</li>
+          <li className="flex gap-3 rounded-xl bg-slate-50 p-3"><Sparkles className="mt-0.5 size-4 shrink-0 text-teal-600" aria-hidden="true" />The care assistant gives guidance only, never a diagnosis.</li>
+          <li className="flex gap-3 rounded-xl bg-slate-50 p-3"><HeartPulse className="mt-0.5 size-4 shrink-0 text-rose-500" aria-hidden="true" />For emergencies, call your local emergency number.</li>
+        </ul>
+      </Card>
     </div>
   );
 }
@@ -79,12 +77,12 @@ function DoctorView({ user }: { user: SessionUser }) {
       <Hero
         role="DOCTOR"
         title={`${user.displayName}`}
-        subtitle="Today's patients, consultations and prescriptions. You only see patients under your care."
+        subtitle="Your patients for the next week. You only see patients who have booked with you and consented to share."
         chips={[d?.specialty ?? '', d ? `${d.experienceYears} yrs experience` : ''].filter(Boolean)}
       />
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <ModuleTile icon={CalendarDays} tone="indigo" title="Today's appointments" text="Your queue, in booking order." checkpoint="Coming in C2" />
-        <ModuleTile icon={ClipboardList} tone="teal" title="Consultations" text="Record complaints, vitals and diagnosis." checkpoint="Coming in C2" />
+      <DoctorAppointments />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ModuleTile icon={ClipboardList} tone="teal" title="Consultations" text="Record complaints, vitals and diagnosis." checkpoint="Coming in C3" />
         <ModuleTile icon={Pill} tone="emerald" title="Prescriptions" text="Preview, sign and issue." checkpoint="Coming in C3" />
         <ModuleTile icon={Activity} tone="amber" title="Priority support" text="Assistive ranking, never a diagnosis." checkpoint="Coming in C6" />
       </div>

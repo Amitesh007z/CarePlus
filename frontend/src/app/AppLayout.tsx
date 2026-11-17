@@ -5,7 +5,20 @@ import { PageLoader } from '../components/PageLoader';
 import { Button } from '../components/ui/Button';
 import { useToast } from '../components/ui/Toast';
 import { useAuth } from '../lib/auth-context';
-import { ROLE_META } from '../types/auth';
+import { ROLE_META, type Role } from '../types/auth';
+
+const NAV: Record<Role, { to: string; label: string }[]> = {
+  PATIENT: [
+    { to: '/patient/dashboard', label: 'Home' },
+    { to: '/doctors', label: 'Doctors' },
+    { to: '/appointments', label: 'Appointments' },
+    { to: '/patient/health', label: 'Health' },
+    { to: '/patient/profile', label: 'Profile' },
+  ],
+  DOCTOR: [{ to: '/doctor/dashboard', label: 'Home' }],
+  PHARMACIST: [{ to: '/pharmacy/dashboard', label: 'Home' }],
+  ADMIN: [{ to: '/admin/dashboard', label: 'Home' }],
+};
 
 const navLink = ({ isActive }: { isActive: boolean }) =>
   `rounded-xl px-3.5 py-2 text-sm font-medium transition ${
@@ -17,6 +30,7 @@ export function AppLayout() {
   const navigate = useNavigate();
   const toast = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
+  const links = user ? NAV[user.role] : [];
 
   async function onSignOut() {
     try {
@@ -39,17 +53,15 @@ export function AppLayout() {
           </Link>
 
           <nav aria-label="Primary" className="hidden items-center gap-1 md:flex">
-            {user && (
-              <NavLink to={ROLE_META[user.role].dashboardPath} className={navLink}>
-                Dashboard
-              </NavLink>
-            )}
+            {links.map((l) => (
+              <NavLink key={l.to} to={l.to} className={navLink}>{l.label}</NavLink>
+            ))}
           </nav>
 
           <div className="flex items-center gap-2">
             {status === 'authenticated' && user ? (
               <>
-                <div className="hidden items-center gap-2 sm:flex">
+                <div className="hidden items-center gap-2 lg:flex">
                   <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${ROLE_META[user.role].chip}`}>
                     {ROLE_META[user.role].label}
                   </span>
@@ -62,30 +74,30 @@ export function AppLayout() {
               </>
             ) : status === 'anonymous' ? (
               <>
-                <Link to="/login" className={navLink({ isActive: false })}>
-                  Sign in
-                </Link>
+                <Link to="/login" className={navLink({ isActive: false })}>Sign in</Link>
                 <Link to="/register" className="rounded-xl bg-gradient-to-r from-teal-600 to-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-teal-600/20">
                   Create account
                 </Link>
               </>
             ) : null}
-            <button
-              type="button"
-              className="rounded-xl p-2 text-ink ring-1 ring-slate-200 md:hidden"
-              aria-label="Toggle navigation"
-              aria-expanded={menuOpen}
-              onClick={() => setMenuOpen((o) => !o)}
-            >
-              <Menu className="size-5" aria-hidden="true" />
-            </button>
+            {links.length > 1 && (
+              <button
+                type="button"
+                className="rounded-xl p-2 text-ink ring-1 ring-slate-200 md:hidden"
+                aria-label="Toggle navigation"
+                aria-expanded={menuOpen}
+                onClick={() => setMenuOpen((o) => !o)}
+              >
+                <Menu className="size-5" aria-hidden="true" />
+              </button>
+            )}
           </div>
         </div>
-        {menuOpen && user && (
-          <nav aria-label="Mobile" className="border-t border-white/60 bg-white/90 px-4 py-3 md:hidden">
-            <NavLink to={ROLE_META[user.role].dashboardPath} className={navLink} onClick={() => setMenuOpen(false)}>
-              Dashboard
-            </NavLink>
+        {menuOpen && links.length > 1 && (
+          <nav aria-label="Mobile" className="grid gap-1 border-t border-white/60 bg-white/90 px-4 py-3 md:hidden">
+            {links.map((l) => (
+              <NavLink key={l.to} to={l.to} className={navLink} onClick={() => setMenuOpen(false)}>{l.label}</NavLink>
+            ))}
           </nav>
         )}
       </header>
