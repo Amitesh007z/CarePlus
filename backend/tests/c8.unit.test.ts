@@ -3,7 +3,7 @@ import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { createLogger } from '../src/common/logger.js';
 import type { Database } from '../src/infrastructure/database/pool.js';
-import { answerCareMessage, type CareServiceDeps } from '../src/modules/ai/care/care.service.js';
+import { answerCareMessage, fallbackKeywords, type CareServiceDeps } from '../src/modules/ai/care/care.service.js';
 import { detectRedFlags, forbiddenClaimIn, urgencyFloor, maxUrgency } from '../src/modules/ai/care/care.rules.js';
 import { removeAllergyConflicts, type ProductCandidate } from '../src/modules/ai/care/care.repository.js';
 import { callStructured, LlmError, type LlmJsonRequest, type LlmProvider } from '../src/modules/ai/llm/provider.js';
@@ -320,6 +320,39 @@ describe('C8 care pipeline', () => {
     const r = await answerCareMessage(deps(s.db, null), actor, 'dry cough');
     expect(r.recommendedProducts).toHaveLength(0);
     expect(r.urgency).toBe('SEE_DOCTOR');
+  });
+
+  it('fallback on a model timeout still offers bookable doctors, never medicines', async () => {
+    const s = scenarioDb({});
+    const llm = scriptedLlm([EXTRACT_OK, new LlmError('TIMEOUT', 'slow')]);
+    const r = await answerCareMessage(deps(s.db, llm), actor, 'dry cough');
+    expect(r.recommendedProducts).toHaveLength(0);
+    expect(r.recommendedDoctors.length).toBeGreaterThan(0);
+    expect(r.recommendedDoctors[0]!.reason).toMatch(/without the assistant/);
+    expect(r.summary).toMatch(/could not prepare suggestions/);
+    expect(r.urgency).toBe('SEE_DOCTOR');
+  });
+
+  it('fallback with no provider key offers doctors from plain words, and still never medicines', async () => {
+    const s = scenarioDb({});
+    const r = await answerCareMessage(deps(s.db, null), actor, 'dry cough');
+    expect(r.recommendedProducts).toHaveLength(0);
+    expect(r.recommendedDoctors.length).toBeGreaterThan(0);
+    expect(r.followUpRequired).toBe(true);
+  });
+
+  it('invalid model output gets the plain fallback with no suggestions at all', async () => {
+    const s = scenarioDb({});
+    const llm = scriptedLlm(['not json', 'still not json']);
+    const r = await answerCareMessage(deps(s.db, llm), actor, 'dry cough');
+    expect(r.recommendedDoctors).toHaveLength(0);
+    expect(r.recommendedProducts).toHaveLength(0);
+  });
+
+  it('fallback keywords come from plain words and are bounded and de-duplicated', () => {
+    expect(fallbackKeywords('I have a dry cough and a dry throat, please help')).toEqual(['cough', 'throat']);
+    expect(fallbackKeywords('a b c')).toEqual([]);
+    expect(fallbackKeywords('alpha bravo charlie delta echo foxtrot golf').length).toBe(5);
   });
 
   it('a patient without health-data consent is blocked before any model call (422)', async () => {
