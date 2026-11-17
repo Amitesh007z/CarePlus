@@ -69,6 +69,9 @@ export interface Appointment {
   cancellation: { at: string; by: string | null; reason: string | null } | null;
   rescheduledCount: number;
   createdAt: string;
+  escalated: boolean;
+  escalationReasons: string[];
+  emergencyGuidance: string | null;
 }
 
 export interface PatientContext {
@@ -89,3 +92,40 @@ export const SYMPTOM_SUGGESTIONS = [
   'Fever', 'Cough', 'Sore throat', 'Headache', 'Body ache', 'Runny nose',
   'Stomach pain', 'Nausea', 'Dizziness', 'Rash', 'Fatigue', 'Breathlessness',
 ];
+
+export interface ConsultationVitals {
+  bpSystolic: number | null;
+  bpDiastolic: number | null;
+  pulse: number | null;
+  temperatureC: number | null;
+  spo2: number | null;
+}
+
+export interface ConsultationDetail {
+  id: string;
+  status: 'DRAFT' | 'FINALIZED';
+  appointmentId: string;
+  patient: { id: string; name: string };
+  doctor: { id: string; name: string; specialty: string };
+  slotStartsAt: string;
+  chiefComplaint: string | null;
+  examinationNotes: string | null;
+  diagnosis: { description: string | null; coded: false };
+  severity: Severity | null;
+  followUpOn: string | null;
+  finalizedAt: string | null;
+  vitals: ConsultationVitals | null;
+  addenda: { id: string; content: string; createdAt: string }[];
+}
+
+export interface VisitSummary {
+  id: string;
+  finalizedAt: string;
+  doctor: { name: string; specialty: string };
+  chiefComplaint: string;
+  diagnosis: { description: string; coded: false };
+  severity: Severity;
+  followUpOn: string | null;
+  vitals: ConsultationVitals | null;
+  addenda: { id: string; content: string; createdAt: string }[];
+}

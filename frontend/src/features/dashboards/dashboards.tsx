@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { CalendarDays, ClipboardList, FileText, HeartPulse, PackageSearch, Pill, ShieldCheck, ShoppingBag, Sparkles, Stethoscope, Users, Boxes, BookOpen, BadgeCheck, Activity, UserRound } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
-import { DoctorAppointments } from '../appointments/DoctorAppointments';
+import { DoctorQueue } from '../appointments/DoctorQueue';
 import type { SessionUser } from '../../types/auth';
 import { Hero, InfoRow, ModuleTile, RoleDashboard } from './RoleDashboard';
 
@@ -47,7 +47,7 @@ function PatientView({ user }: { user: SessionUser }) {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <ModuleTile icon={FileText} tone="emerald" title="Prescriptions" text="Digital prescriptions with PDF." checkpoint="Coming in C3" />
+        <LinkTile to="/patient/visits" icon={FileText} tone="emerald" title="My visits" text="Diagnoses, vitals and corrections from finished visits." />
         <ModuleTile icon={ShoppingBag} tone="amber" title="Medicine orders" text="Buy exactly what you were prescribed." checkpoint="Coming in C4" />
       </div>
 
@@ -80,7 +80,7 @@ function DoctorView({ user }: { user: SessionUser }) {
         subtitle="Your patients for the next week. You only see patients who have booked with you and consented to share."
         chips={[d?.specialty ?? '', d ? `${d.experienceYears} yrs experience` : ''].filter(Boolean)}
       />
-      <DoctorAppointments />
+      <DoctorQueue />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <ModuleTile icon={ClipboardList} tone="teal" title="Consultations" text="Record complaints, vitals and diagnosis." checkpoint="Coming in C3" />
         <ModuleTile icon={Pill} tone="emerald" title="Prescriptions" text="Preview, sign and issue." checkpoint="Coming in C3" />

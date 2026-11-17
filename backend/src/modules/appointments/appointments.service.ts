@@ -4,6 +4,7 @@ import { pageWindow, type PageQuery } from '../../common/http.js';
 import { istInstant } from '../../common/time.js';
 import type { Database, Queryable } from '../../infrastructure/database/pool.js';
 import { CONSENT_REQUIRED } from '../patients/patients.service.js';
+import { EMERGENCY_GUIDANCE, redFlagReasons } from './redFlags.js';
 import type { BookInput } from './appointments.schemas.js';
 import {
   BOOKING_FEE_INR,
@@ -30,6 +31,10 @@ export interface AppointmentView {
   cancellation: { at: string; by: string | null; reason: string | null } | null;
   rescheduledCount: number;
   createdAt: string;
+  /** Set by deterministic red-flag rules. Escalated visits are shown first to the doctor. */
+  escalated: boolean;
+  escalationReasons: string[];
+  emergencyGuidance: string | null;
 }
 
 interface Row {
@@ -46,6 +51,8 @@ interface Row {
   cancelled_by: string | null;
   cancel_reason: string | null;
   rescheduled_count: number;
+  escalated: boolean;
+  escalation_reasons: string[];
   created_at: Date;
   patient_user_id: string;
   patient_name: string;
@@ -60,7 +67,7 @@ interface Row {
 const OCCUPYING_SQL = `(${OCCUPYING_STATUSES.map((s) => `'${s}'`).join(', ')})`;
 
 const VIEW_COLS = `a.id, a.status, a.chief_complaint, a.symptoms, a.duration_days, a.severity, a.additional_notes,
-  a.booking_fee_inr, a.fee_status, a.cancelled_at, a.cancelled_by, a.cancel_reason, a.rescheduled_count, a.created_at,
+  a.booking_fee_inr, a.fee_status, a.cancelled_at, a.cancelled_by, a.cancel_reason, a.rescheduled_count, a.created_at, a.escalated, a.escalation_reasons,
   a.patient_user_id, p.full_name AS patient_name, a.doctor_user_id, d.display_name AS doctor_name, d.specialty,
   s.id AS slot_id, s.starts_at, s.ends_at`;
 
@@ -87,6 +94,9 @@ function toView(r: Row): AppointmentView {
       : null,
     rescheduledCount: r.rescheduled_count,
     createdAt: r.created_at.toISOString(),
+    escalated: r.escalated,
+    escalationReasons: r.escalation_reasons,
+    emergencyGuidance: r.escalated ? EMERGENCY_GUIDANCE : null,
   };
 }
 
@@ -155,15 +165,16 @@ export async function bookAppointment(
     }
     await assertSlotFree(tx, slot.id);
 
+    const reasons = redFlagReasons([input.chiefComplaint, ...input.symptoms, input.additionalNotes ?? ''].join(' '));
     const inserted = await withSlotConflict(() =>
       tx.query<{ id: string }>(
         `INSERT INTO appointments (patient_user_id, doctor_user_id, slot_id, status, chief_complaint, symptoms,
-           duration_days, severity, additional_notes, booking_fee_inr)
-         VALUES ($1, $2, $3, 'REQUESTED', $4, $5, $6, $7, $8, $9)
+           duration_days, severity, additional_notes, booking_fee_inr, escalated, escalation_reasons)
+         VALUES ($1, $2, $3, 'REQUESTED', $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING id`,
         [
           patientId, slot.doctor_user_id, slot.id, input.chiefComplaint, input.symptoms, input.durationDays,
-          input.severity, input.additionalNotes ?? null, BOOKING_FEE_INR,
+          input.severity, input.additionalNotes ?? null, BOOKING_FEE_INR, reasons.length > 0, reasons,
         ],
       ),
     );
@@ -322,7 +333,7 @@ export async function listDoctorAppointments(
   const params = [doctorId, istInstant(q.from, '00:00').toISOString(), istInstant(q.to, '00:00').toISOString(), q.status ?? null];
   const w = pageWindow(q);
   const [rows, count] = await Promise.all([
-    db.query<Row>(`SELECT ${VIEW_COLS} ${FROM_SQL} ${where} ORDER BY s.starts_at ASC LIMIT $5 OFFSET $6`, [...params, w.limit, w.offset]),
+    db.query<Row>(`SELECT ${VIEW_COLS} ${FROM_SQL} ${where} ORDER BY a.escalated DESC, s.starts_at ASC LIMIT $5 OFFSET $6`, [...params, w.limit, w.offset]),
     db.query<{ n: number }>(`SELECT COUNT(*)::int AS n ${FROM_SQL} ${where}`, params),
   ]);
   return { items: rows.rows.map(toView), total: count.rows[0]?.n ?? 0 };
@@ -360,5 +371,18 @@ export async function setStatusByDoctor(
       after: { status: to },
     });
   });
+  return loadView(db, appointmentId);
+}
+
+/** A doctor's view of one appointment. Owner-only, and refused while the patient has withdrawn consent. */
+export async function getAppointmentForDoctor(db: Queryable, doctorId: string, appointmentId: string): Promise<AppointmentView> {
+  const r = await db.query<{ doctor_user_id: string; consent_status: boolean }>(
+    `SELECT a.doctor_user_id, p.consent_status FROM appointments a
+       JOIN patient_profiles p ON p.user_id = a.patient_user_id WHERE a.id = $1`,
+    [appointmentId],
+  );
+  const row = r.rows[0];
+  if (!row || row.doctor_user_id !== doctorId) throw notFound('Appointment not found');
+  if (!row.consent_status) throw new AppError(403, 'CONSENT_WITHDRAWN', 'This patient has withdrawn consent to share health information');
   return loadView(db, appointmentId);
 }

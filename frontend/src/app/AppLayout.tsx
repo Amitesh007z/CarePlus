@@ -12,6 +12,7 @@ const NAV: Record<Role, { to: string; label: string }[]> = {
     { to: '/patient/dashboard', label: 'Home' },
     { to: '/doctors', label: 'Doctors' },
     { to: '/appointments', label: 'Appointments' },
+    { to: '/patient/visits', label: 'Visits' },
     { to: '/patient/health', label: 'Health' },
     { to: '/patient/profile', label: 'Profile' },
   ],

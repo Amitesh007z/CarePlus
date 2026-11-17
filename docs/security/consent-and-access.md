@@ -38,3 +38,12 @@ Records are not deleted on withdrawal. Deletion is a separate, later decision.
 ## Audit
 - Sensitive changes write an append-only `audit_logs` row: profile edits, consent changes, health and medication changes, bookings, cancellations, reschedules and doctor status changes.
 - Audit rows store identifiers and states only, never health text or contact details.
+
+## Consultations and clinical records (C3)
+- A doctor reads or writes a consultation only if they are its doctor. Anyone else gets `404`. Every doctor request also checks current consent, and withdrawal gives `403 CONSENT_WITHDRAWN`.
+- Drafts can be saved and edited. Finalizing locks the record, and the database enforces this with triggers. Finalized consultations cannot be updated or deleted, and their vitals cannot change. Corrections are addenda, which are append-only. Addenda can only be added to finalized records.
+- A consultation is tied to one appointment, patient and doctor by a composite foreign key, so a mismatched record cannot be inserted.
+- Vitals have plausibility bounds only, to catch input errors. They are not clinical thresholds.
+- Diagnosis is free text and labelled "not coded". No diagnosis code list is loaded, so no code is stored or implied.
+- Escalation uses fixed rules for the three examples in the source brief: chest pain, breathing difficulty and possible stroke signs. Matching bookings are flagged and listed first for the doctor, and the patient is shown emergency guidance. The rules are not a triage protocol.
+- Patients see only their own finalized visits, with addenda. Drafts are never returned to patients.
