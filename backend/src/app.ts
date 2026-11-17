@@ -17,6 +17,7 @@ import { patientsRouter } from './modules/patients/patients.routes.js';
 import { doctorsRouter } from './modules/doctors/doctors.routes.js';
 import { appointmentsRouter } from './modules/appointments/appointments.routes.js';
 import { consultationsRouter } from './modules/consultations/consultations.routes.js';
+import { prescriptionsRouter } from './modules/prescriptions/prescriptions.routes.js';
 
 export interface AppDeps {
   env: Pick<Env, 'APP_ORIGIN'> & Partial<Pick<Env, 'NODE_ENV' | 'SESSION_TTL_HOURS'>>;
@@ -87,6 +88,7 @@ export function createApp({ env, db, logger, migrationsDir, hasher, limits }: Ap
   api.use(doctorsRouter({ db, nodeEnv }));
   api.use(appointmentsRouter({ db, nodeEnv }));
   api.use(consultationsRouter({ db, nodeEnv }));
+  api.use(prescriptionsRouter({ db, nodeEnv }));
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);

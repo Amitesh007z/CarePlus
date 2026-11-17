@@ -13,6 +13,10 @@ const PatientChartPage = lazy(() => import('../features/doctors/PatientChartPage
 const DoctorAppointmentPage = lazy(() => import('../features/appointments/DoctorAppointmentPage'));
 const ConsultationPage = lazy(() => import('../features/consultations/ConsultationPage'));
 const VisitsPage = lazy(() => import('../features/patient/VisitsPage'));
+const DoctorPrescriptionPage = lazy(() => import('../features/prescriptions/PrescriptionPages').then((m) => ({ default: m.DoctorPrescriptionPage })));
+const PrescriptionPreviewPage = lazy(() => import('../features/prescriptions/PrescriptionPages').then((m) => ({ default: m.PrescriptionPreviewPage })));
+const PatientPrescriptionsPage = lazy(() => import('../features/prescriptions/PrescriptionPages').then((m) => ({ default: m.PatientPrescriptionsPage })));
+const PatientPrescriptionDetailPage = lazy(() => import('../features/prescriptions/PrescriptionPages').then((m) => ({ default: m.PatientPrescriptionDetailPage })));
 const AppointmentsPage = lazy(() => import('../features/appointments/AppointmentsPage'));
 const ProfilePage = lazy(() => import('../features/patient/ProfilePage'));
 const HealthPage = lazy(() => import('../features/patient/HealthPage'));
@@ -39,6 +43,10 @@ export const routes: RouteObject[] = [
       { path: '/doctor/appointments/:appointmentId', element: <RequireRole roles={['DOCTOR']}><DoctorAppointmentPage /></RequireRole> },
       { path: '/doctor/consultations/:consultationId', element: <RequireRole roles={['DOCTOR']}><ConsultationPage /></RequireRole> },
       { path: '/patient/visits', element: <RequireRole roles={['PATIENT']}><VisitsPage /></RequireRole> },
+      { path: '/patient/prescriptions', element: <RequireRole roles={['PATIENT']}><PatientPrescriptionsPage /></RequireRole> },
+      { path: '/patient/prescriptions/:prescriptionId', element: <RequireRole roles={['PATIENT']}><PatientPrescriptionDetailPage /></RequireRole> },
+      { path: '/doctor/prescriptions/:prescriptionId', element: <RequireRole roles={['DOCTOR']}><DoctorPrescriptionPage /></RequireRole> },
+      { path: '/doctor/prescriptions/:prescriptionId/preview', element: <RequireRole roles={['DOCTOR']}><PrescriptionPreviewPage /></RequireRole> },
       { path: '/pharmacy/dashboard', element: <RequireRole roles={['PHARMACIST']}><PharmacistDashboard /></RequireRole> },
       { path: '/admin/dashboard', element: <RequireRole roles={['ADMIN']}><AdminDashboard /></RequireRole> },
       { path: '*', element: <NotFoundPage /> },

@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { loadEnv } from '../config/env.js';
 import { getDriver } from '../infrastructure/database/driver.js';
 import { createPasswordHasher } from '../modules/auth/password.js';
+import { upsertMedicineSeed } from '../modules/medicines/catalogue.seed.js';
 
 /**
  * Synthetic demo accounts. Idempotent: existing users are left untouched (passwords are never reset).
@@ -48,6 +49,8 @@ const hasher = createPasswordHasher();
 const client = new (getDriver().Client)({ connectionString: url });
 await client.connect();
 try {
+  const added = await upsertMedicineSeed(client);
+  console.log(`medicines: ${added} added (existing SKUs untouched)`);
   for (const s of seeds) {
     const exists = await client.query('SELECT 1 FROM users WHERE email = $1', [s.email]);
     if (exists.rowCount) {

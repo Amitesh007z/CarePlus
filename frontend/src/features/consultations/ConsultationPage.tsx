@@ -12,6 +12,7 @@ import { messageOf, useApi } from '../../lib/useApi';
 import { SEVERITY_OPTIONS, type ConsultationDetail, type PatientContext } from '../../types/clinical';
 import { Hero, InfoRow } from '../dashboards/RoleDashboard';
 import { ConsultationForm } from './ConsultationForm';
+import { ConsultationPrescriptions } from '../prescriptions/ConsultationPrescriptions';
 import { toBody, validate, valuesFrom, type DraftValues } from './draft';
 
 export default function ConsultationPage() {
@@ -168,6 +169,7 @@ function Workspace({ initial }: { initial: ConsultationDetail }) {
         </div>
 
         <aside className="space-y-6">
+          <ConsultationPrescriptions consultationId={record.id} finalized={!isDraft} />
           <Card title="Patient snapshot" description="For safety while you write. Full chart is one click away.">
             {context.loading && <p className="text-sm text-slate-500">Loading…</p>}
             {context.error && <p className="text-sm text-rose-700">{context.error}</p>}
